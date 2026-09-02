@@ -9,6 +9,11 @@ import { Spinner } from '@/components/ui/Loading';
 import { Download, LogOut, Baby, Target, Clock } from 'lucide-react';
 import type { MealWithRelations } from '@/lib/types';
 
+function csvField(value: string | number): string {
+  const str = String(value);
+  return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+}
+
 function mealsToCSV(meals: MealWithRelations[]): string {
   const rows: string[] = [];
   rows.push('date,time,meal_slot,main_meal,carbs,pairings,glucose_1h_mg_dl,glucose_measured_at,walked_after,walk_minutes,notes');
@@ -22,13 +27,20 @@ function mealsToCSV(meals: MealWithRelations[]): string {
     const pairings = meal.meal_pairings
       .map((p) => [p.pairing_family, p.item_name, p.quantity, p.unit].filter(Boolean).join(' '))
       .join('; ');
-    const glucose = meal.glucose_1h_mg_dl ?? '';
-    const glucoseTime = meal.glucose_measured_at ?? '';
-    const walked = meal.walked_after ? 'yes' : 'no';
-    const walkMin = meal.walk_minutes ?? '';
-    const notes = (meal.notes ?? '').replace(/"/g, '""');
 
-    const row = [date, time, meal.meal_slot, meal.main_meal ?? '', carbs, pairings, glucose, glucoseTime, walked, walkMin, `"${notes}"`];
+    const row = [
+      date,
+      time,
+      meal.meal_slot,
+      meal.main_meal ?? '',
+      carbs,
+      pairings,
+      meal.glucose_1h_mg_dl ?? '',
+      meal.glucose_measured_at ?? '',
+      meal.walked_after ? 'yes' : 'no',
+      meal.walk_minutes ?? '',
+      meal.notes ?? '',
+    ].map(csvField);
     rows.push(row.join(','));
   }
 
