@@ -5,8 +5,7 @@ import { Input } from '@/components/ui/Input';
 import { Activity } from 'lucide-react';
 
 export function AuthScreen() {
-  const { signIn, signUp } = useAuth();
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -16,8 +15,7 @@ export function AuthScreen() {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
-    const fn = mode === 'signin' ? signIn : signUp;
-    const { error: err } = await fn(email.trim(), password);
+    const { error: err } = await signIn(email.trim(), password);
     setSubmitting(false);
     if (err) {
       setError(err);
@@ -57,7 +55,7 @@ export function AuthScreen() {
             placeholder="At least 6 characters"
             required
             minLength={6}
-            autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+            autoComplete="current-password"
           />
           {error && (
             <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
@@ -65,19 +63,9 @@ export function AuthScreen() {
             </p>
           )}
           <Button type="submit" size="lg" className="w-full" disabled={submitting}>
-            {submitting ? 'Please wait...' : mode === 'signin' ? 'Sign in' : 'Create account'}
+            {submitting ? 'Please wait...' : 'Sign in'}
           </Button>
         </form>
-
-        <button
-          onClick={() => {
-            setMode(mode === 'signin' ? 'signup' : 'signin');
-            setError(null);
-          }}
-          className="w-full text-center text-sm text-teal-600 hover:text-teal-700 mt-4 transition-colors"
-        >
-          {mode === 'signin' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
-        </button>
       </div>
     </div>
   );

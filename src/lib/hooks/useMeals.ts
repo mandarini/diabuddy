@@ -99,6 +99,22 @@ export async function setMealCarbs(
   return { error: insError?.message ?? null };
 }
 
+export async function getRecentFruitNames(): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('meal_carbs')
+    .select('item_name')
+    .eq('carb_family', 'Fruit')
+    .not('item_name', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (error || !data) return [];
+  const seen = new Set<string>();
+  for (const row of data as { item_name: string }[]) {
+    seen.add(row.item_name);
+  }
+  return [...seen];
+}
+
 export async function setMealPairings(
   mealId: string,
   pairings: { pairing_family: string; item_name?: string; quantity?: number; unit?: string }[]

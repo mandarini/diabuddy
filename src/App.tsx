@@ -8,12 +8,25 @@ import { InsightsScreen } from '@/screens/InsightsScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 import { LoadingScreen } from '@/components/ui/Loading';
 
+const OWNER_EMAIL = import.meta.env.VITE_OWNER_EMAIL as string;
+
 function AppContent() {
-  const { session, loading } = useAuth();
+  const { session, loading, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<TabId>('today');
 
   if (loading) return <LoadingScreen />;
   if (!session) return <AuthScreen />;
+
+  if (session.user.email !== OWNER_EMAIL) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-stone-50 px-6 text-center">
+        <p className="text-stone-700">This account isn't authorized to use this app.</p>
+        <button onClick={signOut} className="text-teal-600 hover:text-teal-700">
+          Sign out
+        </button>
+      </div>
+    );
+  }
 
   return (
     <AppShell activeTab={activeTab} onTabChange={setActiveTab}>

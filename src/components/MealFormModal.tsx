@@ -12,6 +12,7 @@ import {
   type MealSlot,
   type MealWithRelations,
 } from '@/lib/types';
+import { getRecentFruitNames } from '@/lib/hooks/useMeals';
 
 interface MealFormModalProps {
   open: boolean;
@@ -81,6 +82,14 @@ export function MealFormModal({
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fruitSuggestions, setFruitSuggestions] = useState<string[]>(COMMON_FRUITS);
+
+  useEffect(() => {
+    if (!open) return;
+    getRecentFruitNames().then((recent) => {
+      setFruitSuggestions([...new Set([...recent, ...COMMON_FRUITS])]);
+    });
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -228,18 +237,13 @@ export function MealFormModal({
                   </button>
                 </div>
                 {carb.carb_family === 'Fruit' ? (
-                  <select
+                  <input
                     className="w-full px-3 py-2 rounded-lg border border-stone-200 bg-white text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                    placeholder="Which fruit?"
+                    list="fruit-suggestions"
                     value={carb.item_name}
                     onChange={(e) => handleCarbChange(idx, 'item_name', e.target.value)}
-                  >
-                    <option value="">Select fruit (optional)</option>
-                    {COMMON_FRUITS.map((f) => (
-                      <option key={f} value={f}>
-                        {f}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 ) : (
                   <input
                     className="w-full px-3 py-2 rounded-lg border border-stone-200 bg-white text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
@@ -346,6 +350,12 @@ export function MealFormModal({
           onChange={(e) => setNotes(e.target.value)}
           placeholder="How you felt, cravings, etc."
         />
+
+        <datalist id="fruit-suggestions">
+          {fruitSuggestions.map((f) => (
+            <option key={f} value={f} />
+          ))}
+        </datalist>
 
         {error && (
           <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
