@@ -4,12 +4,11 @@ export interface GestationalAge {
   formatted: string;
 }
 
-export function getGestationalAge(date: Date, dueDate: Date): GestationalAge | null {
-  const diff = dueDate.getTime() - date.getTime();
-  if (diff < 0) {
-    return { weeks: 40, days: 0, formatted: '40w0d' };
-  }
-  const totalDays = Math.floor(diff / (1000 * 60 * 60 * 24));
+export function getGestationalAge(date: Date, dueDate: Date): GestationalAge {
+  const day = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const due = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+  const daysRemaining = Math.round((due.getTime() - day.getTime()) / (1000 * 60 * 60 * 24));
+  const totalDays = Math.max(0, 280 - daysRemaining);
   const weeks = Math.floor(totalDays / 7);
   const days = totalDays % 7;
   return { weeks, days, formatted: `${weeks}w${days}d` };
