@@ -125,4 +125,6 @@ export const COMMON_FRUITS = [
   'Watermelon',
   'Mandarin',
   'Prickly pear',
+  'Dried Prunes',
+  'Dried Mango'
 ];
