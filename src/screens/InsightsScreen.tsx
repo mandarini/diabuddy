@@ -49,12 +49,14 @@ export function InsightsScreen() {
   const insights = useMemo(() => {
     const mealsWithGlucose = meals.filter((m) => m.glucose_1h_mg_dl !== null);
 
-    // Per-carb-family glucose stats
+    // Per-category glucose stats
     const byCarbFamily: Record<string, number[]> = {};
     for (const meal of mealsWithGlucose) {
       for (const carb of meal.meal_carbs) {
-        if (!byCarbFamily[carb.carb_family]) byCarbFamily[carb.carb_family] = [];
-        byCarbFamily[carb.carb_family].push(meal.glucose_1h_mg_dl!);
+        if (!carb.food) continue;
+        const categoryName = carb.food.category.name;
+        if (!byCarbFamily[categoryName]) byCarbFamily[categoryName] = [];
+        byCarbFamily[categoryName].push(meal.glucose_1h_mg_dl!);
       }
     }
 
@@ -62,9 +64,9 @@ export function InsightsScreen() {
     const byFruit: Record<string, number[]> = {};
     for (const meal of mealsWithGlucose) {
       for (const carb of meal.meal_carbs) {
-        if (carb.carb_family === 'Fruit' && carb.item_name) {
-          if (!byFruit[carb.item_name]) byFruit[carb.item_name] = [];
-          byFruit[carb.item_name].push(meal.glucose_1h_mg_dl!);
+        if (carb.food?.category.name === 'Fruit') {
+          if (!byFruit[carb.food.name]) byFruit[carb.food.name] = [];
+          byFruit[carb.food.name].push(meal.glucose_1h_mg_dl!);
         }
       }
     }

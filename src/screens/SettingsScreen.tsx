@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Loading';
 import { Download, LogOut, Baby, Target, Clock } from 'lucide-react';
-import type { MealWithRelations } from '@/lib/types';
+import { formatFoodLabel, type MealWithRelations } from '@/lib/types';
 
 function csvField(value: string | number): string {
   const str = String(value);
@@ -22,10 +22,12 @@ function mealsToCSV(meals: MealWithRelations[]): string {
     const date = meal.eaten_at.slice(0, 10);
     const time = meal.eaten_at.slice(11, 16);
     const carbs = meal.meal_carbs
-      .map((c) => [c.carb_family, c.item_name, c.quantity, c.unit].filter(Boolean).join(' '))
+      .filter((c) => c.food)
+      .map((c) => [formatFoodLabel(c.food!), c.quantity, c.unit].filter(Boolean).join(' '))
       .join('; ');
     const pairings = meal.meal_pairings
-      .map((p) => [p.pairing_family, p.item_name, p.quantity, p.unit].filter(Boolean).join(' '))
+      .filter((p) => p.food)
+      .map((p) => [formatFoodLabel(p.food!), p.quantity, p.unit].filter(Boolean).join(' '))
       .join('; ');
 
     const row = [
