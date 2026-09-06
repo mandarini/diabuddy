@@ -13,6 +13,7 @@ tmp
 supabase/.temp
 *.local
 docs/superpowers/*
+.claude/worktrees
 
 .vscode/*
 !.vscode/extensions.json
