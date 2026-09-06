@@ -21,28 +21,55 @@ export interface MealEntry {
   updated_at: string;
 }
 
+export type CategoryType = 'carb' | 'pairing';
+
+export interface Category {
+  id: string;
+  name: string;
+  type: CategoryType;
+  sort_order: number;
+}
+
+export interface Food {
+  id: string;
+  category_id: string;
+  user_id: string | null;
+  name: string;
+  created_at: string;
+}
+
+export interface FoodWithCategory extends Food {
+  category: Category;
+}
+
 export interface MealCarb {
   id: string;
   meal_id: string;
   user_id: string;
-  carb_family: string;
-  item_name: string | null;
+  food_id: string;
   quantity: number | null;
   unit: string | null;
   notes: string | null;
   created_at: string;
+  food?: FoodWithCategory;
 }
 
 export interface MealPairing {
   id: string;
   meal_id: string;
   user_id: string;
-  pairing_family: string;
-  item_name: string | null;
+  food_id: string;
   quantity: number | null;
   unit: string | null;
   notes: string | null;
   created_at: string;
+  food?: FoodWithCategory;
+}
+
+export function formatFoodLabel(food: FoodWithCategory): string {
+  return food.name.toLowerCase() === food.category.name.toLowerCase()
+    ? food.category.name
+    : `${food.category.name} (${food.name})`;
 }
 
 export interface MealWithRelations extends MealEntry {
@@ -89,42 +116,4 @@ export const MEAL_SLOTS: { value: MealSlot; label: string }[] = [
   { value: 'other', label: 'Other' },
 ];
 
-export const CARB_FAMILIES = [
-  'Rice',
-  'Quinoa',
-  'Rusk',
-  'Bread',
-  'Oats',
-  'Potato',
-  'Pasta',
-  'Fruit',
-  'Other',
-];
-
-export const PAIRING_FAMILIES = [
-  'Nuts',
-  'Yogurt',
-  'Nut butter',
-  'Tahini',
-  'Cheese',
-  'Egg',
-  'Other',
-];
-
 export const CARB_UNITS = ['g', 'piece', 'slice', 'tbsp', 'tsp', 'cup', 'portion'];
-
-export const COMMON_FRUITS = [
-  'Banana',
-  'Apple',
-  'Peach',
-  'Pear',
-  'Kiwi',
-  'Strawberries',
-  'Orange',
-  'Grapes',
-  'Watermelon',
-  'Mandarin',
-  'Prickly pear',
-  'Dried Prunes',
-  'Dried Mango'
-];
