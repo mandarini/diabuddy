@@ -23,6 +23,7 @@ export function HistoryScreen() {
   const [editingMeal, setEditingMeal] = useState<MealWithRelations | null>(null);
   const [mealFormOpen, setMealFormOpen] = useState(false);
   const [glucoseModalMeal, setGlucoseModalMeal] = useState<MealWithRelations | null>(null);
+  const [followupGlucoseModalMeal, setFollowupGlucoseModalMeal] = useState<MealWithRelations | null>(null);
   const [walkModalMeal, setWalkModalMeal] = useState<MealWithRelations | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<MealWithRelations | null>(null);
   const { categories } = useCategories();
@@ -105,6 +106,20 @@ export function HistoryScreen() {
       setGlucoseModalMeal(null);
     },
     [glucoseModalMeal, refetch]
+  );
+
+  const handleSaveFollowupGlucose = useCallback(
+    async (glucose: number, measuredAt: string) => {
+      if (!followupGlucoseModalMeal) return;
+      const { error } = await updateMeal(followupGlucoseModalMeal.id, {
+        glucose_followup_mg_dl: glucose,
+        glucose_followup_measured_at: measuredAt,
+      });
+      if (error) throw new Error(error);
+      refetch();
+      setFollowupGlucoseModalMeal(null);
+    },
+    [followupGlucoseModalMeal, refetch]
   );
 
   const handleSaveWalk = useCallback(
@@ -205,6 +220,7 @@ export function HistoryScreen() {
                     }}
                     onDelete={() => setDeleteConfirm(meal)}
                     onAddGlucose={() => setGlucoseModalMeal(meal)}
+                    onAddFollowupGlucose={() => setFollowupGlucoseModalMeal(meal)}
                     onAddWalk={() => setWalkModalMeal(meal)}
                   />
                 ))}
@@ -230,6 +246,15 @@ export function HistoryScreen() {
         mealEatenAt={glucoseModalMeal?.eaten_at ?? new Date().toISOString()}
         currentValue={glucoseModalMeal?.glucose_1h_mg_dl}
         currentMeasuredAt={glucoseModalMeal?.glucose_measured_at}
+      />
+      <GlucoseModal
+        open={!!followupGlucoseModalMeal}
+        onClose={() => setFollowupGlucoseModalMeal(null)}
+        onSave={handleSaveFollowupGlucose}
+        mealEatenAt={followupGlucoseModalMeal?.eaten_at ?? new Date().toISOString()}
+        currentValue={followupGlucoseModalMeal?.glucose_followup_mg_dl}
+        currentMeasuredAt={followupGlucoseModalMeal?.glucose_followup_measured_at}
+        title="Follow-up glucose"
       />
       <WalkModal
         open={!!walkModalMeal}

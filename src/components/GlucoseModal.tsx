@@ -11,6 +11,7 @@ interface GlucoseModalProps {
   mealEatenAt: string;
   currentValue?: number | null;
   currentMeasuredAt?: string | null;
+  title?: string;
 }
 
 export function GlucoseModal({
@@ -20,6 +21,7 @@ export function GlucoseModal({
   mealEatenAt,
   currentValue,
   currentMeasuredAt,
+  title = 'Post-meal glucose',
 }: GlucoseModalProps) {
   const [glucose, setGlucose] = useState('');
   const [measuredAt, setMeasuredAt] = useState('');
@@ -66,7 +68,7 @@ export function GlucoseModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Post-meal glucose"
+      title={title}
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={saving}>

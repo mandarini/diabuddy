@@ -14,6 +14,8 @@ export interface MealEntry {
   main_meal: string | null;
   glucose_1h_mg_dl: number | null;
   glucose_measured_at: string | null;
+  glucose_followup_mg_dl: number | null;
+  glucose_followup_measured_at: string | null;
   walked_after: boolean;
   walk_minutes: number | null;
   notes: string | null;

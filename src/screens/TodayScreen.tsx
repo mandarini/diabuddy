@@ -27,6 +27,7 @@ export function TodayScreen({ userId: _userId }: TodayScreenProps) {
   const [mealFormOpen, setMealFormOpen] = useState(false);
   const [editingMeal, setEditingMeal] = useState<MealWithRelations | null>(null);
   const [glucoseModalMeal, setGlucoseModalMeal] = useState<MealWithRelations | null>(null);
+  const [followupGlucoseModalMeal, setFollowupGlucoseModalMeal] = useState<MealWithRelations | null>(null);
   const [walkModalMeal, setWalkModalMeal] = useState<MealWithRelations | null>(null);
   const [morningBpOpen, setMorningBpOpen] = useState(false);
   const [eveningBpOpen, setEveningBpOpen] = useState(false);
@@ -69,6 +70,8 @@ export function TodayScreen({ userId: _userId }: TodayScreenProps) {
           notes: data.notes || null,
           glucose_1h_mg_dl: null,
           glucose_measured_at: null,
+          glucose_followup_mg_dl: null,
+          glucose_followup_measured_at: null,
           walked_after: false,
           walk_minutes: null,
         });
@@ -114,6 +117,20 @@ export function TodayScreen({ userId: _userId }: TodayScreenProps) {
       setGlucoseModalMeal(null);
     },
     [glucoseModalMeal, refetch]
+  );
+
+  const handleSaveFollowupGlucose = useCallback(
+    async (glucose: number, measuredAt: string) => {
+      if (!followupGlucoseModalMeal) return;
+      const { error } = await updateMeal(followupGlucoseModalMeal.id, {
+        glucose_followup_mg_dl: glucose,
+        glucose_followup_measured_at: measuredAt,
+      });
+      if (error) throw new Error(error);
+      refetch();
+      setFollowupGlucoseModalMeal(null);
+    },
+    [followupGlucoseModalMeal, refetch]
   );
 
   const handleSaveWalk = useCallback(
@@ -286,6 +303,7 @@ export function TodayScreen({ userId: _userId }: TodayScreenProps) {
               }}
               onDelete={() => setDeleteConfirm(meal)}
               onAddGlucose={() => setGlucoseModalMeal(meal)}
+              onAddFollowupGlucose={() => setFollowupGlucoseModalMeal(meal)}
               onAddWalk={() => setWalkModalMeal(meal)}
             />
           ))}
@@ -339,6 +357,15 @@ export function TodayScreen({ userId: _userId }: TodayScreenProps) {
         mealEatenAt={glucoseModalMeal?.eaten_at ?? new Date().toISOString()}
         currentValue={glucoseModalMeal?.glucose_1h_mg_dl}
         currentMeasuredAt={glucoseModalMeal?.glucose_measured_at}
+      />
+      <GlucoseModal
+        open={!!followupGlucoseModalMeal}
+        onClose={() => setFollowupGlucoseModalMeal(null)}
+        onSave={handleSaveFollowupGlucose}
+        mealEatenAt={followupGlucoseModalMeal?.eaten_at ?? new Date().toISOString()}
+        currentValue={followupGlucoseModalMeal?.glucose_followup_mg_dl}
+        currentMeasuredAt={followupGlucoseModalMeal?.glucose_followup_measured_at}
+        title="Follow-up glucose"
       />
       <WalkModal
         open={!!walkModalMeal}

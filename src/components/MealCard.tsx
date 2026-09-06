@@ -8,6 +8,7 @@ interface MealCardProps {
   onEdit: () => void;
   onDelete: () => void;
   onAddGlucose: () => void;
+  onAddFollowupGlucose: () => void;
   onAddWalk: () => void;
   targetMax?: number | null;
 }
@@ -23,6 +24,7 @@ export function MealCard({
   onEdit,
   onDelete,
   onAddGlucose,
+  onAddFollowupGlucose,
   onAddWalk,
   targetMax,
 }: MealCardProps) {
@@ -39,6 +41,9 @@ export function MealCard({
 
   const minutesAfter = meal.glucose_measured_at
     ? minutesAfterMeal(meal.eaten_at, meal.glucose_measured_at)
+    : null;
+  const followupMinutesAfter = meal.glucose_followup_measured_at
+    ? minutesAfterMeal(meal.eaten_at, meal.glucose_followup_measured_at)
     : null;
 
   return (
@@ -102,6 +107,23 @@ export function MealCard({
             <span className="text-xs opacity-70">({minutesAfter}m)</span>
           )}
         </button>
+
+        {meal.glucose_1h_mg_dl && (
+          <button
+            onClick={onAddFollowupGlucose}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+              meal.glucose_followup_mg_dl
+                ? glucoseColor(meal.glucose_followup_mg_dl, targetMax)
+                : 'bg-stone-50 text-stone-500 border-stone-200 hover:bg-stone-100'
+            }`}
+          >
+            <Droplet size={14} />
+            {meal.glucose_followup_mg_dl ? `${meal.glucose_followup_mg_dl} mg/dL` : 'Add follow-up'}
+            {followupMinutesAfter !== null && meal.glucose_followup_mg_dl && (
+              <span className="text-xs opacity-70">({followupMinutesAfter}m)</span>
+            )}
+          </button>
+        )}
 
         <button
           onClick={onAddWalk}

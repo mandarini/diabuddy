@@ -16,7 +16,7 @@ function csvField(value: string | number): string {
 
 function mealsToCSV(meals: MealWithRelations[]): string {
   const rows: string[] = [];
-  rows.push('date,time,meal_slot,main_meal,carbs,pairings,glucose_1h_mg_dl,glucose_measured_at,walked_after,walk_minutes,notes');
+  rows.push('date,time,meal_slot,main_meal,carbs,pairings,glucose_1h_mg_dl,glucose_measured_at,glucose_followup_mg_dl,glucose_followup_measured_at,walked_after,walk_minutes,notes');
 
   for (const meal of meals) {
     const date = meal.eaten_at.slice(0, 10);
@@ -39,6 +39,8 @@ function mealsToCSV(meals: MealWithRelations[]): string {
       pairings,
       meal.glucose_1h_mg_dl ?? '',
       meal.glucose_measured_at ?? '',
+      meal.glucose_followup_mg_dl ?? '',
+      meal.glucose_followup_measured_at ?? '',
       meal.walked_after ? 'yes' : 'no',
       meal.walk_minutes ?? '',
       meal.notes ?? '',
