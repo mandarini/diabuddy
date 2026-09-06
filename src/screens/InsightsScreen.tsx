@@ -71,6 +71,19 @@ export function InsightsScreen() {
       }
     }
 
+    // Per-carb-food-and-quantity glucose stats (dose-response)
+    const byCarbAmount: Record<string, number[]> = {};
+    for (const meal of mealsWithGlucose) {
+      for (const carb of meal.meal_carbs) {
+        if (!carb.food || carb.quantity == null) continue;
+        const label = carb.unit
+          ? `${carb.food.name} (${carb.quantity} ${carb.unit})`
+          : `${carb.food.name} (${carb.quantity})`;
+        if (!byCarbAmount[label]) byCarbAmount[label] = [];
+        byCarbAmount[label].push(meal.glucose_1h_mg_dl!);
+      }
+    }
+
     // Walking vs non-walking
     const walked = mealsWithGlucose.filter((m) => m.walked_after).map((m) => m.glucose_1h_mg_dl!);
     const notWalked = mealsWithGlucose.filter((m) => !m.walked_after).map((m) => m.glucose_1h_mg_dl!);
@@ -93,14 +106,35 @@ export function InsightsScreen() {
       .filter((m) => m.meal_pairings.length === 0)
       .map((m) => m.glucose_1h_mg_dl!);
 
+    // Effect of each pairing category (Fat/Protein/Fiber) individually
+    const pairingCategoryNames = ['Fat', 'Protein', 'Fiber'];
+    const byPairingCategory: Record<string, { with: number[]; without: number[] }> = {};
+    for (const name of pairingCategoryNames) {
+      byPairingCategory[name] = { with: [], without: [] };
+    }
+    for (const meal of mealsWithGlucose) {
+      const presentCategories = new Set(
+        meal.meal_pairings.filter((p) => p.food).map((p) => p.food!.category.name)
+      );
+      for (const name of pairingCategoryNames) {
+        if (presentCategories.has(name)) {
+          byPairingCategory[name].with.push(meal.glucose_1h_mg_dl!);
+        } else {
+          byPairingCategory[name].without.push(meal.glucose_1h_mg_dl!);
+        }
+      }
+    }
+
     return {
       byCarbFamily,
       byFruit,
+      byCarbAmount,
       walked: computeStats(walked),
       notWalked: computeStats(notWalked),
       byMainMeal,
       withPairing: computeStats(withPairing),
       withoutPairing: computeStats(withoutPairing),
+      byPairingCategory,
       totalMeals: meals.length,
       mealsWithGlucose: mealsWithGlucose.length,
     };
@@ -248,6 +282,36 @@ export function InsightsScreen() {
             </InsightCard>
           )}
 
+          {/* Carb amount (dose-response) glucose */}
+          {Object.keys(insights.byCarbAmount).length > 0 && (
+            <InsightCard title="Glucose by carb amount" icon={<Droplet size={16} className="text-teal-600" />}>
+              <div className="space-y-1">
+                {Object.entries(insights.byCarbAmount)
+                  .sort((a, b) => computeStats(a[1])!.average - computeStats(b[1])!.average)
+                  .map(([label, values]) => {
+                    const stats = computeStats(values)!;
+                    const isHigh = stats.average > postmealTarget;
+                    return (
+                      <div
+                        key={label}
+                        className="flex items-center justify-between py-2 border-b border-stone-50 last:border-0"
+                      >
+                        <span className="text-sm text-stone-500">{label}</span>
+                        <span
+                          className={`text-sm font-semibold ${
+                            isHigh ? 'text-amber-600' : 'text-stone-700'
+                          }`}
+                        >
+                          {stats.average} mg/dL
+                          <span className="text-xs text-stone-400 font-normal ml-2">(n={stats.n})</span>
+                        </span>
+                      </div>
+                    );
+                  })}
+              </div>
+            </InsightCard>
+          )}
+
           {/* Pairing effect */}
           {insights.withPairing && insights.withoutPairing && (
             <InsightCard title="Effect of fat/protein pairings" icon={<TrendingUp size={16} className="text-teal-600" />}>
@@ -263,6 +327,32 @@ export function InsightsScreen() {
               )}
             </InsightCard>
           )}
+
+          {/* Effect of each pairing category */}
+          {Object.entries(insights.byPairingCategory)
+            .filter(([, data]) => data.with.length > 0 && data.without.length > 0)
+            .map(([category, data]) => {
+              const withStats = computeStats(data.with)!;
+              const withoutStats = computeStats(data.without)!;
+              return (
+                <InsightCard
+                  key={category}
+                  title={`Effect of ${category.toLowerCase()}`}
+                  icon={<TrendingUp size={16} className="text-teal-600" />}
+                >
+                  <div className="space-y-1">
+                    <StatRow label={`With ${category.toLowerCase()}`} stats={withStats} unit="mg/dL" />
+                    <StatRow label={`Without ${category.toLowerCase()}`} stats={withoutStats} unit="mg/dL" />
+                  </div>
+                  {withStats.average < withoutStats.average && (
+                    <p className="text-xs text-teal-600 mt-2">
+                      {category} lowered average glucose by{' '}
+                      {(withoutStats.average - withStats.average).toFixed(1)} mg/dL
+                    </p>
+                  )}
+                </InsightCard>
+              );
+            })}
 
           {/* Same-meal walking comparison */}
           {Object.entries(insights.byMainMeal)

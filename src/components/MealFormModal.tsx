@@ -120,7 +120,18 @@ export function MealFormModal({
     );
   };
   const handleCarbFieldChange = (idx: number, field: 'food_name' | 'quantity' | 'unit', value: string) => {
-    setCarbs(carbs.map((c, i) => (i === idx ? { ...c, [field]: value } : c)));
+    setCarbs(
+      carbs.map((c, i) => {
+        if (i !== idx) return c;
+        if (field === 'food_name') {
+          const matched = foodsForCategory(c.category_id).find(
+            (f) => f.name.toLowerCase() === value.toLowerCase()
+          );
+          return { ...c, food_name: value, unit: matched?.default_unit ?? c.unit };
+        }
+        return { ...c, [field]: value };
+      })
+    );
   };
 
   const handleAddPairing = () => {
@@ -137,7 +148,18 @@ export function MealFormModal({
     );
   };
   const handlePairingFieldChange = (idx: number, field: 'food_name' | 'quantity' | 'unit', value: string) => {
-    setPairings(pairings.map((p, i) => (i === idx ? { ...p, [field]: value } : p)));
+    setPairings(
+      pairings.map((p, i) => {
+        if (i !== idx) return p;
+        if (field === 'food_name') {
+          const matched = foodsForCategory(p.category_id).find(
+            (f) => f.name.toLowerCase() === value.toLowerCase()
+          );
+          return { ...p, food_name: value, unit: matched?.default_unit ?? p.unit };
+        }
+        return { ...p, [field]: value };
+      })
+    );
   };
 
   const handleSubmit = async (e: FormEvent) => {

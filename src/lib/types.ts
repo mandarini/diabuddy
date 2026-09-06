@@ -37,6 +37,7 @@ export interface Food {
   category_id: string;
   user_id: string | null;
   name: string;
+  default_unit: string | null;
   created_at: string;
 }
 
