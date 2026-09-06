@@ -12,6 +12,7 @@ dist-ssr
 tmp
 supabase/.temp
 *.local
+docs/superpowers/*
 
 .vscode/*
 !.vscode/extensions.json
