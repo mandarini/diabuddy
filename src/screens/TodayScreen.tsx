@@ -46,8 +46,7 @@ export function TodayScreen({ userId: _userId }: TodayScreenProps) {
         const { error: carbErr } = await setMealCarbs(
           editingMeal.id,
           data.carbs.map((c) => ({
-            carb_family: c.carb_family,
-            item_name: c.item_name || undefined,
+            food_id: c.food_id,
             quantity: c.quantity ? Number(c.quantity) : undefined,
             unit: c.unit || undefined,
           }))
@@ -56,8 +55,7 @@ export function TodayScreen({ userId: _userId }: TodayScreenProps) {
         const { error: pairingErr } = await setMealPairings(
           editingMeal.id,
           data.pairings.map((p) => ({
-            pairing_family: p.pairing_family,
-            item_name: p.item_name || undefined,
+            food_id: p.food_id,
             quantity: p.quantity ? Number(p.quantity) : undefined,
             unit: p.unit || undefined,
           }))
@@ -79,8 +77,7 @@ export function TodayScreen({ userId: _userId }: TodayScreenProps) {
           const { error: carbErr } = await setMealCarbs(
             meal.id,
             data.carbs.map((c) => ({
-              carb_family: c.carb_family,
-              item_name: c.item_name || undefined,
+              food_id: c.food_id,
               quantity: c.quantity ? Number(c.quantity) : undefined,
               unit: c.unit || undefined,
             }))
@@ -91,8 +88,7 @@ export function TodayScreen({ userId: _userId }: TodayScreenProps) {
           const { error: pairingErr } = await setMealPairings(
             meal.id,
             data.pairings.map((p) => ({
-              pairing_family: p.pairing_family,
-              item_name: p.item_name || undefined,
+              food_id: p.food_id,
               quantity: p.quantity ? Number(p.quantity) : undefined,
               unit: p.unit || undefined,
             }))

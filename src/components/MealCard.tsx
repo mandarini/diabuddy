@@ -1,6 +1,6 @@
 import { Pencil, Trash2, Droplet, Footprints, Clock } from 'lucide-react';
 import type { MealWithRelations } from '@/lib/types';
-import { MEAL_SLOTS } from '@/lib/types';
+import { MEAL_SLOTS, formatFoodLabel } from '@/lib/types';
 import { formatTimeFromISO, minutesAfterMeal } from '@/lib/date';
 
 interface MealCardProps {
@@ -29,10 +29,12 @@ export function MealCard({
   const slotLabel = MEAL_SLOTS.find((s) => s.value === meal.meal_slot)?.label ?? meal.meal_slot;
   const eatenTime = formatTimeFromISO(meal.eaten_at);
   const carbsText = meal.meal_carbs
-    .map((c) => (c.item_name ? `${c.carb_family} (${c.item_name})` : c.carb_family))
+    .filter((c) => c.food)
+    .map((c) => formatFoodLabel(c.food!))
     .join(', ');
   const pairingsText = meal.meal_pairings
-    .map((p) => (p.item_name ? `${p.pairing_family} (${p.item_name})` : p.pairing_family))
+    .filter((p) => p.food)
+    .map((p) => formatFoodLabel(p.food!))
     .join(', ');
 
   const minutesAfter = meal.glucose_measured_at

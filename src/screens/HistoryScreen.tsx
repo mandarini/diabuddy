@@ -2,7 +2,8 @@ import { useState, useMemo, useCallback } from 'react';
 import { Pencil, Trash2, Plus, Search, Filter } from 'lucide-react';
 import { useAllMeals, updateMeal, deleteMeal, setMealCarbs, setMealPairings } from '@/lib/hooks/useMeals';
 import { useUserSettings } from '@/lib/hooks/useUserSettings';
-import { MEAL_SLOTS, CARB_FAMILIES, type MealWithRelations, type MealSlot } from '@/lib/types';
+import { MEAL_SLOTS, formatFoodLabel, type MealWithRelations, type MealSlot } from '@/lib/types';
+import { useCategories } from '@/lib/hooks/useFoods';
 import { MealCard } from '@/components/MealCard';
 import { MealFormModal, type MealFormData } from '@/components/MealFormModal';
 import { GlucoseModal } from '@/components/GlucoseModal';
@@ -24,20 +25,22 @@ export function HistoryScreen() {
   const [glucoseModalMeal, setGlucoseModalMeal] = useState<MealWithRelations | null>(null);
   const [walkModalMeal, setWalkModalMeal] = useState<MealWithRelations | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<MealWithRelations | null>(null);
+  const { categories } = useCategories();
+  const carbCategories = categories.filter((c) => c.type === 'carb');
 
   const filteredMeals = useMemo(() => {
     return meals.filter((m) => {
       if (slotFilter !== 'all' && m.meal_slot !== slotFilter) return false;
       if (carbFilter !== 'all') {
-        const hasCarb = m.meal_carbs.some((c) => c.carb_family === carbFilter);
+        const hasCarb = m.meal_carbs.some((c) => c.food?.category_id === carbFilter);
         if (!hasCarb) return false;
       }
       if (search.trim()) {
         const q = search.toLowerCase();
         const text = [
           m.main_meal,
-          ...m.meal_carbs.map((c) => `${c.carb_family} ${c.item_name ?? ''}`),
-          ...m.meal_pairings.map((p) => `${p.pairing_family} ${p.item_name ?? ''}`),
+          ...m.meal_carbs.filter((c) => c.food).map((c) => formatFoodLabel(c.food!)),
+          ...m.meal_pairings.filter((p) => p.food).map((p) => formatFoodLabel(p.food!)),
           m.notes,
         ].join(' ').toLowerCase();
         if (!text.includes(q)) return false;
@@ -69,8 +72,7 @@ export function HistoryScreen() {
       const { error: carbErr } = await setMealCarbs(
         editingMeal.id,
         data.carbs.map((c) => ({
-          carb_family: c.carb_family,
-          item_name: c.item_name || undefined,
+          food_id: c.food_id,
           quantity: c.quantity ? Number(c.quantity) : undefined,
           unit: c.unit || undefined,
         }))
@@ -79,8 +81,7 @@ export function HistoryScreen() {
       const { error: pairingErr } = await setMealPairings(
         editingMeal.id,
         data.pairings.map((p) => ({
-          pairing_family: p.pairing_family,
-          item_name: p.item_name || undefined,
+          food_id: p.food_id,
           quantity: p.quantity ? Number(p.quantity) : undefined,
           unit: p.unit || undefined,
         }))
@@ -167,9 +168,9 @@ export function HistoryScreen() {
             onChange={(e) => setCarbFilter(e.target.value)}
           >
             <option value="all">All carb types</option>
-            {CARB_FAMILIES.map((f) => (
-              <option key={f} value={f}>
-                {f}
+            {carbCategories.map((cat) => (
+              <option key={cat.id} value={cat.id}>
+                {cat.name}
               </option>
             ))}
           </Select>
