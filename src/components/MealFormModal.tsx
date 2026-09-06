@@ -3,16 +3,8 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import { Plus, Trash2 } from 'lucide-react';
-import {
-  MEAL_SLOTS,
-  CARB_FAMILIES,
-  PAIRING_FAMILIES,
-  CARB_UNITS,
-  COMMON_FRUITS,
-  type MealSlot,
-  type MealWithRelations,
-} from '@/lib/types';
-import { getRecentFruitNames } from '@/lib/hooks/useMeals';
+import { MEAL_SLOTS, CARB_UNITS, type MealSlot, type MealWithRelations, type Food } from '@/lib/types';
+import { useCategories, useFoods, findOrCreateFood } from '@/lib/hooks/useFoods';
 
 interface MealFormModalProps {
   open: boolean;
@@ -23,15 +15,15 @@ interface MealFormModalProps {
 }
 
 export interface CarbRow {
-  carb_family: string;
-  item_name: string;
+  category_id: string;
+  food_name: string;
   quantity: string;
   unit: string;
 }
 
 export interface PairingRow {
-  pairing_family: string;
-  item_name: string;
+  category_id: string;
+  food_name: string;
   quantity: string;
   unit: string;
 }
@@ -39,18 +31,9 @@ export interface PairingRow {
 export interface MealFormData {
   eaten_at: string;
   meal_slot: MealSlot;
-  main_meal: string;
-  carbs: CarbRow[];
-  pairings: PairingRow[];
-  notes: string;
-}
-
-export interface MealSubmitData {
-  eaten_at: string;
-  meal_slot: MealSlot;
   main_meal: string | undefined;
-  carbs: { carb_family: string; item_name: string; quantity: string; unit: string }[];
-  pairings: { pairing_family: string; item_name: string; quantity: string; unit: string }[];
+  carbs: { food_id: string; quantity: string; unit: string }[];
+  pairings: { food_id: string; quantity: string; unit: string }[];
   notes: string | undefined;
 }
 
@@ -59,12 +42,8 @@ function toLocalDatetimeInput(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-function emptyCarb(): CarbRow {
-  return { carb_family: 'Rice', item_name: '', quantity: '', unit: 'g' };
-}
-
-function emptyPairing(): PairingRow {
-  return { pairing_family: 'Nuts', item_name: '', quantity: '', unit: '' };
+function emptyRow(categoryId: string, categoryName: string, unit: string): CarbRow {
+  return { category_id: categoryId, food_name: categoryName, quantity: '', unit };
 }
 
 export function MealFormModal({
@@ -74,69 +53,90 @@ export function MealFormModal({
   editingMeal,
   defaultSlot = 'breakfast',
 }: MealFormModalProps) {
+  const { categories } = useCategories();
+  const { foods, refetch: refetchFoods } = useFoods();
+  const carbCategories = categories.filter((c) => c.type === 'carb');
+  const pairingCategories = categories.filter((c) => c.type === 'pairing');
+
   const [eatenAt, setEatenAt] = useState(toLocalDatetimeInput(new Date()));
   const [mealSlot, setMealSlot] = useState<MealSlot>(defaultSlot);
   const [mainMeal, setMainMeal] = useState('');
-  const [carbs, setCarbs] = useState<CarbRow[]>([emptyCarb()]);
+  const [carbs, setCarbs] = useState<CarbRow[]>([]);
   const [pairings, setPairings] = useState<PairingRow[]>([]);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fruitSuggestions, setFruitSuggestions] = useState<string[]>(COMMON_FRUITS);
 
   useEffect(() => {
-    if (!open) return;
-    getRecentFruitNames().then((recent) => {
-      setFruitSuggestions([...new Set([...recent, ...COMMON_FRUITS])]);
-    });
-  }, [open]);
+    if (open) refetchFoods();
+  }, [open, refetchFoods]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || categories.length === 0) return;
     setError(null);
     if (editingMeal) {
       setEatenAt(toLocalDatetimeInput(new Date(editingMeal.eaten_at)));
       setMealSlot(editingMeal.meal_slot);
       setMainMeal(editingMeal.main_meal ?? '');
       setCarbs(
-        editingMeal.meal_carbs.length > 0
-          ? editingMeal.meal_carbs.map((c) => ({
-              carb_family: c.carb_family,
-              item_name: c.item_name ?? '',
-              quantity: c.quantity?.toString() ?? '',
-              unit: c.unit ?? 'g',
-            }))
-          : [emptyCarb()]
+        editingMeal.meal_carbs.map((c) => ({
+          category_id: c.food?.category_id ?? '',
+          food_name: c.food?.name ?? '',
+          quantity: c.quantity?.toString() ?? '',
+          unit: c.unit ?? 'g',
+        }))
       );
       setPairings(
         editingMeal.meal_pairings.map((p) => ({
-          pairing_family: p.pairing_family,
-          item_name: p.item_name ?? '',
+          category_id: p.food?.category_id ?? '',
+          food_name: p.food?.name ?? '',
           quantity: p.quantity?.toString() ?? '',
           unit: p.unit ?? '',
         }))
       );
       setNotes(editingMeal.notes ?? '');
     } else {
+      const firstCarbCategory = categories.find((c) => c.type === 'carb');
       setEatenAt(toLocalDatetimeInput(new Date()));
       setMealSlot(defaultSlot);
       setMainMeal('');
-      setCarbs([emptyCarb()]);
+      setCarbs(firstCarbCategory ? [emptyRow(firstCarbCategory.id, firstCarbCategory.name, 'g')] : []);
       setPairings([]);
       setNotes('');
     }
-  }, [open, editingMeal, defaultSlot]);
+  }, [open, editingMeal, defaultSlot, categories]);
 
-  const handleAddCarb = () => setCarbs([...carbs, emptyCarb()]);
+  const handleAddCarb = () => {
+    if (!carbCategories[0]) return;
+    setCarbs([...carbs, emptyRow(carbCategories[0].id, carbCategories[0].name, 'g')]);
+  };
   const handleRemoveCarb = (idx: number) => setCarbs(carbs.filter((_, i) => i !== idx));
-  const handleCarbChange = (idx: number, field: keyof CarbRow, value: string) => {
+  const handleCarbCategoryChange = (idx: number, categoryId: string) => {
+    const category = carbCategories.find((c) => c.id === categoryId);
+    setCarbs(
+      carbs.map((c, i) =>
+        i === idx ? { ...c, category_id: categoryId, food_name: category?.name ?? '' } : c
+      )
+    );
+  };
+  const handleCarbFieldChange = (idx: number, field: 'food_name' | 'quantity' | 'unit', value: string) => {
     setCarbs(carbs.map((c, i) => (i === idx ? { ...c, [field]: value } : c)));
   };
 
-  const handleAddPairing = () => setPairings([...pairings, emptyPairing()]);
-  const handleRemovePairing = (idx: number) =>
-    setPairings(pairings.filter((_, i) => i !== idx));
-  const handlePairingChange = (idx: number, field: keyof PairingRow, value: string) => {
+  const handleAddPairing = () => {
+    if (!pairingCategories[0]) return;
+    setPairings([...pairings, emptyRow(pairingCategories[0].id, pairingCategories[0].name, '')]);
+  };
+  const handleRemovePairing = (idx: number) => setPairings(pairings.filter((_, i) => i !== idx));
+  const handlePairingCategoryChange = (idx: number, categoryId: string) => {
+    const category = pairingCategories.find((c) => c.id === categoryId);
+    setPairings(
+      pairings.map((p, i) =>
+        i === idx ? { ...p, category_id: categoryId, food_name: category?.name ?? '' } : p
+      )
+    );
+  };
+  const handlePairingFieldChange = (idx: number, field: 'food_name' | 'quantity' | 'unit', value: string) => {
     setPairings(pairings.map((p, i) => (i === idx ? { ...p, [field]: value } : p)));
   };
 
@@ -145,12 +145,26 @@ export function MealFormModal({
     setSaving(true);
     setError(null);
     try {
+      const resolvedCarbs: { food_id: string; quantity: string; unit: string }[] = [];
+      for (const c of carbs) {
+        if (!c.food_name.trim()) continue;
+        const { data: food, error: foodErr } = await findOrCreateFood(c.category_id, c.food_name);
+        if (foodErr || !food) throw new Error(foodErr ?? 'Failed to resolve food');
+        resolvedCarbs.push({ food_id: food.id, quantity: c.quantity, unit: c.unit });
+      }
+      const resolvedPairings: { food_id: string; quantity: string; unit: string }[] = [];
+      for (const p of pairings) {
+        if (!p.food_name.trim()) continue;
+        const { data: food, error: foodErr } = await findOrCreateFood(p.category_id, p.food_name);
+        if (foodErr || !food) throw new Error(foodErr ?? 'Failed to resolve food');
+        resolvedPairings.push({ food_id: food.id, quantity: p.quantity, unit: p.unit });
+      }
       await onSave({
         eaten_at: new Date(eatenAt).toISOString(),
         meal_slot: mealSlot,
         main_meal: mainMeal.trim(),
-        carbs: carbs.filter((c) => c.carb_family),
-        pairings: pairings.filter((p) => p.pairing_family),
+        carbs: resolvedCarbs,
+        pairings: resolvedPairings,
         notes: notes.trim(),
       });
       onClose();
@@ -160,6 +174,9 @@ export function MealFormModal({
       setSaving(false);
     }
   };
+
+  const foodsForCategory = (categoryId: string): Food[] =>
+    foods.filter((f) => f.category_id === categoryId);
 
   return (
     <Modal
@@ -219,12 +236,12 @@ export function MealFormModal({
                 <div className="flex gap-2">
                   <select
                     className="flex-1 px-3 py-2 rounded-lg border border-stone-200 bg-white text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
-                    value={carb.carb_family}
-                    onChange={(e) => handleCarbChange(idx, 'carb_family', e.target.value)}
+                    value={carb.category_id}
+                    onChange={(e) => handleCarbCategoryChange(idx, e.target.value)}
                   >
-                    {CARB_FAMILIES.map((f) => (
-                      <option key={f} value={f}>
-                        {f}
+                    {carbCategories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
                       </option>
                     ))}
                   </select>
@@ -236,22 +253,18 @@ export function MealFormModal({
                     <Trash2 size={18} />
                   </button>
                 </div>
-                {carb.carb_family === 'Fruit' ? (
-                  <input
-                    className="w-full px-3 py-2 rounded-lg border border-stone-200 bg-white text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
-                    placeholder="Which fruit?"
-                    list="fruit-suggestions"
-                    value={carb.item_name}
-                    onChange={(e) => handleCarbChange(idx, 'item_name', e.target.value)}
-                  />
-                ) : (
-                  <input
-                    className="w-full px-3 py-2 rounded-lg border border-stone-200 bg-white text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
-                    placeholder="Specific item (optional)"
-                    value={carb.item_name}
-                    onChange={(e) => handleCarbChange(idx, 'item_name', e.target.value)}
-                  />
-                )}
+                <input
+                  className="w-full px-3 py-2 rounded-lg border border-stone-200 bg-white text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                  placeholder="Which food?"
+                  list={`carb-food-options-${idx}`}
+                  value={carb.food_name}
+                  onChange={(e) => handleCarbFieldChange(idx, 'food_name', e.target.value)}
+                />
+                <datalist id={`carb-food-options-${idx}`}>
+                  {foodsForCategory(carb.category_id).map((f) => (
+                    <option key={f.id} value={f.name} />
+                  ))}
+                </datalist>
                 <div className="flex gap-2">
                   <input
                     className="flex-1 px-3 py-2 rounded-lg border border-stone-200 bg-white text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
@@ -259,12 +272,12 @@ export function MealFormModal({
                     type="number"
                     inputMode="decimal"
                     value={carb.quantity}
-                    onChange={(e) => handleCarbChange(idx, 'quantity', e.target.value)}
+                    onChange={(e) => handleCarbFieldChange(idx, 'quantity', e.target.value)}
                   />
                   <select
                     className="w-28 px-3 py-2 rounded-lg border border-stone-200 bg-white text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
                     value={carb.unit}
-                    onChange={(e) => handleCarbChange(idx, 'unit', e.target.value)}
+                    onChange={(e) => handleCarbFieldChange(idx, 'unit', e.target.value)}
                   >
                     {CARB_UNITS.map((u) => (
                       <option key={u} value={u}>
@@ -281,7 +294,7 @@ export function MealFormModal({
         {/* Pairings section */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-stone-600">Pairings (fat/protein)</span>
+            <span className="text-sm font-medium text-stone-600">Pairings (fat/protein/fiber)</span>
             <button
               type="button"
               onClick={handleAddPairing}
@@ -299,12 +312,12 @@ export function MealFormModal({
                   <div className="flex gap-2">
                     <select
                       className="flex-1 px-3 py-2 rounded-lg border border-stone-200 bg-white text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
-                      value={pairing.pairing_family}
-                      onChange={(e) => handlePairingChange(idx, 'pairing_family', e.target.value)}
+                      value={pairing.category_id}
+                      onChange={(e) => handlePairingCategoryChange(idx, e.target.value)}
                     >
-                      {PAIRING_FAMILIES.map((f) => (
-                        <option key={f} value={f}>
-                          {f}
+                      {pairingCategories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
                         </option>
                       ))}
                     </select>
@@ -318,10 +331,16 @@ export function MealFormModal({
                   </div>
                   <input
                     className="w-full px-3 py-2 rounded-lg border border-stone-200 bg-white text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
-                    placeholder="Specific item (optional)"
-                    value={pairing.item_name}
-                    onChange={(e) => handlePairingChange(idx, 'item_name', e.target.value)}
+                    placeholder="Which food?"
+                    list={`pairing-food-options-${idx}`}
+                    value={pairing.food_name}
+                    onChange={(e) => handlePairingFieldChange(idx, 'food_name', e.target.value)}
                   />
+                  <datalist id={`pairing-food-options-${idx}`}>
+                    {foodsForCategory(pairing.category_id).map((f) => (
+                      <option key={f.id} value={f.name} />
+                    ))}
+                  </datalist>
                   <div className="flex gap-2">
                     <input
                       className="flex-1 px-3 py-2 rounded-lg border border-stone-200 bg-white text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
@@ -329,13 +348,13 @@ export function MealFormModal({
                       type="number"
                       inputMode="decimal"
                       value={pairing.quantity}
-                      onChange={(e) => handlePairingChange(idx, 'quantity', e.target.value)}
+                      onChange={(e) => handlePairingFieldChange(idx, 'quantity', e.target.value)}
                     />
                     <input
                       className="w-28 px-3 py-2 rounded-lg border border-stone-200 bg-white text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
                       placeholder="Unit"
                       value={pairing.unit}
-                      onChange={(e) => handlePairingChange(idx, 'unit', e.target.value)}
+                      onChange={(e) => handlePairingFieldChange(idx, 'unit', e.target.value)}
                     />
                   </div>
                 </div>
@@ -350,12 +369,6 @@ export function MealFormModal({
           onChange={(e) => setNotes(e.target.value)}
           placeholder="How you felt, cravings, etc."
         />
-
-        <datalist id="fruit-suggestions">
-          {fruitSuggestions.map((f) => (
-            <option key={f} value={f} />
-          ))}
-        </datalist>
 
         {error && (
           <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
