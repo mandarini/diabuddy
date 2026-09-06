@@ -12,7 +12,7 @@ export function useTodayMeals(dayDate: string) {
     const endISO = `${dayDate}T23:59:59.999+03:00`;
     const { data, error } = await supabase
       .from('meal_entries')
-      .select('*, meal_carbs(*), meal_pairings(*)')
+      .select('*, meal_carbs(*, food:foods(*, category:categories(*))), meal_pairings(*, food:foods(*, category:categories(*)))')
       .gte('eaten_at', startISO)
       .lte('eaten_at', endISO)
       .order('eaten_at', { ascending: true });
@@ -40,7 +40,7 @@ export function useAllMeals() {
     setLoading(true);
     const { data, error } = await supabase
       .from('meal_entries')
-      .select('*, meal_carbs(*), meal_pairings(*)')
+      .select('*, meal_carbs(*, food:foods(*, category:categories(*))), meal_pairings(*, food:foods(*, category:categories(*)))')
       .order('eaten_at', { ascending: false });
     if (error) {
       console.error('Error fetching meals:', error.message);
@@ -85,7 +85,7 @@ export async function deleteMeal(id: string): Promise<{ error: string | null }> 
 
 export async function setMealCarbs(
   mealId: string,
-  carbs: { carb_family: string; item_name?: string; quantity?: number; unit?: string }[]
+  carbs: { food_id: string; quantity?: number; unit?: string }[]
 ): Promise<{ error: string | null }> {
   const { error: delError } = await supabase
     .from('meal_carbs')
@@ -99,25 +99,9 @@ export async function setMealCarbs(
   return { error: insError?.message ?? null };
 }
 
-export async function getRecentFruitNames(): Promise<string[]> {
-  const { data, error } = await supabase
-    .from('meal_carbs')
-    .select('item_name')
-    .eq('carb_family', 'Fruit')
-    .not('item_name', 'is', null)
-    .order('created_at', { ascending: false })
-    .limit(200);
-  if (error || !data) return [];
-  const seen = new Set<string>();
-  for (const row of data as { item_name: string }[]) {
-    seen.add(row.item_name);
-  }
-  return [...seen];
-}
-
 export async function setMealPairings(
   mealId: string,
-  pairings: { pairing_family: string; item_name?: string; quantity?: number; unit?: string }[]
+  pairings: { food_id: string; quantity?: number; unit?: string }[]
 ): Promise<{ error: string | null }> {
   const { error: delError } = await supabase
     .from('meal_pairings')
