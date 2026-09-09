@@ -62,7 +62,10 @@ Reminders are Web Push notifications sent by the `send-glucose-reminders` Edge F
 
 	```sh
 	supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=mailto:you@example.com
+	supabase secrets set ALLOWED_ORIGINS=https://your-app.example.com,http://localhost:5173
 	```
+
+	`ALLOWED_ORIGINS` is the comma-separated list of origins allowed to call the browser-facing functions.
 
 4. In the dashboard, under Settings → API keys → Secret keys, create a secret key named `cron`.
 5. In the SQL editor, store the project URL and that key in Vault:
@@ -88,7 +91,7 @@ The two Deno functions in [`supabase/functions`](supabase/functions) are built o
 - **`send-glucose-reminders`** is invoked by Supabase Cron every five minutes with the `cron` secret key on the `apikey` header. Its stack is `pipeline([withSupabase({ auth: 'secret:cron' }), withPostgresAdminClient()], handler)`. `withSupabase` accepts only that named key and answers anything else with 401 (`verify_jwt` is off for this function in `supabase/config.toml`, because the platform check cannot validate `sb_secret_` keys). `withPostgresAdminClient` contributes `ctx.postgresAdmin`, a direct Postgres connection; one SQL statement selects the due meals joined to their devices, and the handler sends each push, marks `reminder_sent_at`, and prunes dead subscriptions.
 - **`send-test-notification`** and **`remove-device`** are invoked from the browser by a signed-in user through `supabase.functions.invoke`, each with `{ endpoint }` in the body. Both are `pipeline([withDeviceRequest()], handler)`, where `withDeviceRequest` ([`_shared/with-device-request.ts`](supabase/functions/_shared/with-device-request.ts)) is a `defineComposite` bundling `withCors({ origin: ALLOWED_ORIGINS })`, `withSupabase({ auth: 'user', cors: 'disabled' })`, and `withPushSubscription()`, with `cors` marked `internal` since no handler reads it. `withCors` answers the preflight ahead of the auth gate. `withSupabase` verifies the session JWT and contributes `ctx.supabase`, an RLS-scoped client. `withPushSubscription` ([`_shared/with-push-subscription.ts`](supabase/functions/_shared/with-push-subscription.ts)) is a `defineMiddleware` entry that declares `supabase` as a prerequisite and either contributes `ctx.pushSubscription` — the caller's own row for that endpoint — or short-circuits with 400/404. The handlers only send a push, or delete the row.
 
-`ALLOWED_ORIGINS` in `_shared/with-device-request.ts` lists the origins allowed to call those functions; set it to your deployment's origin.
+The origins allowed to call those functions come from the `ALLOWED_ORIGINS` function secret (see Reminders Setup); without it only `http://localhost:5173` is allowed.
 
 ## Data Isolation
 

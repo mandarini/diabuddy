@@ -3,7 +3,11 @@ import { withCors } from '@supabase/middleware/cors';
 import { withSupabase } from '@supabase/server';
 import { withPushSubscription } from './with-push-subscription.ts';
 
-export const ALLOWED_ORIGINS = ['https://diabuddy.netlify.app', 'http://localhost:5173'];
+// Comma-separated list in the ALLOWED_ORIGINS function secret; the dev server origin is the fallback.
+export const ALLOWED_ORIGINS = (Deno.env.get('ALLOWED_ORIGINS') ?? 'http://localhost:5173')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 // The stack every endpoint acting on the caller's own device shares: the preflight is
 // answered ahead of the auth gate, the client is RLS-scoped, and the device row is resolved.
