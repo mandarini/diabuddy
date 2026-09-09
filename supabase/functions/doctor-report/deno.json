@@ -1,0 +1,12 @@
+{
+  "imports": {
+    "@supabase/middleware": "npm:@supabase/middleware@0.5.0",
+    "@supabase/middleware/cors": "npm:@supabase/middleware@0.5.0/cors",
+    "@supabase/middleware/feature-flag": "npm:@supabase/middleware@0.5.0/feature-flag",
+    "@supabase/server": "npm:@supabase/server@1.6.0",
+    "@supabase/server/middleware/postgres": "npm:@supabase/server@1.6.0/middleware/postgres",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.116.0",
+    "pg": "npm:pg@8.23.0",
+    "web-push": "npm:web-push@3.6.7"
+  }
+}
