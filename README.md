@@ -77,7 +77,7 @@ Reminders are Web Push notifications sent by the `send-glucose-reminders` Edge F
 	supabase db push --linked
 	```
 
-7. Open Settings on each device and press **Enable on this device**. On iPhone, add the app to the Home Screen first.
+7. Open Settings on each device and press **Enable on this device**. On iPhone, add the app to the Home Screen first. **Send test notification** confirms delivery to that device without waiting for a meal.
 
 ## Scripts
 
