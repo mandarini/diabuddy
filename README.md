@@ -20,7 +20,7 @@ It is not a calorie counter or a comprehensive food diary. DiaBuddy focuses on f
 - **Today:** Log today's meals and daily measurements from one screen.
 - **History:** Search and filter previous meals by meal slot or carbohydrate category, then edit or delete entries.
 - **Insights:** Compare glucose averages by carbohydrate type, fruit, pairings, and post-meal walking. Repeated meals can also be compared with and without a walk.
-- **Settings:** Set glucose targets and due date, export meal data as CSV, and sign out.
+- **Settings:** Set glucose targets and due date, export meal data as CSV or in the doctor's log format, and sign out.
 - **Reminders:** Opt in per device to a push notification one hour after a meal whose 1-hour reading is still missing; send a test notification, and remove devices you no longer use.
 
 DiaBuddy stores data in Supabase. Its database schema uses row-level security so authenticated users can access only their own records.
@@ -91,7 +91,17 @@ The two Deno functions in [`supabase/functions`](supabase/functions) are built o
 - **`send-glucose-reminders`** is invoked by Supabase Cron every five minutes with the `cron` secret key on the `apikey` header. Its stack is `pipeline([withSupabase({ auth: 'secret:cron' }), withPostgresAdminClient()], handler)`. `withSupabase` accepts only that named key and answers anything else with 401 (`verify_jwt` is off for this function in `supabase/config.toml`, because the platform check cannot validate `sb_secret_` keys). `withPostgresAdminClient` contributes `ctx.postgresAdmin`, a direct Postgres connection; one SQL statement selects the due meals joined to their devices, and the handler sends each push, marks `reminder_sent_at`, and prunes dead subscriptions.
 - **`send-test-notification`** and **`remove-device`** are invoked from the browser by a signed-in user through `supabase.functions.invoke`, each with `{ endpoint }` in the body. Both are `pipeline([withDeviceRequest()], handler)`, where `withDeviceRequest` ([`_shared/with-device-request.ts`](supabase/functions/_shared/with-device-request.ts)) is a `defineComposite` bundling `withCors({ origin: ALLOWED_ORIGINS })`, `withSupabase({ auth: 'user', cors: 'disabled' })`, and `withPushSubscription()`, with `cors` marked `internal` since no handler reads it. `withCors` answers the preflight ahead of the auth gate. `withSupabase` verifies the session JWT and contributes `ctx.supabase`, an RLS-scoped client. `withPushSubscription` ([`_shared/with-push-subscription.ts`](supabase/functions/_shared/with-push-subscription.ts)) is a `defineMiddleware` entry that declares `supabase` as a prerequisite and either contributes `ctx.pushSubscription` — the caller's own row for that endpoint — or short-circuits with 400/404. The handlers only send a push, or delete the row.
 
+- **`doctor-report`** builds the doctor-format CSV on the server for users the `doctor-report` feature flag admits. Its stack is `pipeline([withCors(...), withSupabase({ auth: 'user', cors: 'disabled' }), withFeatureFlag({ name: 'doctor-report', evaluate }), withPostgresClient()], handler)`. `withFeatureFlag` reads the caller's row in `feature_flags` (with a client scoped by the request's own token, since `evaluate` sees only the request) and answers `404 feature_disabled` otherwise. `withPostgresClient` contributes `ctx.postgres`, a direct Postgres connection that runs as the caller with RLS enforced; one SQL statement produces the per-day rows, computing days in the user's timezone and weights per 7-day block. The Settings screen tries this function first and falls back to the local CSV when the flag is off.
+
 The origins allowed to call those functions come from the `ALLOWED_ORIGINS` function secret (see Reminders Setup); without it only `http://localhost:5173` is allowed.
+
+## Feature Flags
+
+`public.feature_flags` holds one row per `(flag, user_id)`; a user without a row is not admitted. Rows are managed from the SQL editor and are readable only by their owner:
+
+```sql
+insert into public.feature_flags (flag, user_id) values ('doctor-report', '<user uuid>');
+```
 
 ## Data Isolation
 

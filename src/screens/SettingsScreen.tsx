@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Loading';
 import { RemindersCard } from '@/components/RemindersCard';
+import { fetchDoctorReport } from '@/lib/export/doctorReport';
 import { Download, LogOut, Baby, Target, Clock, Github } from 'lucide-react';
 import { formatFoodLabel, type MealWithRelations, type DailyMetrics, type MealSlot } from '@/lib/types';
 
@@ -208,9 +209,17 @@ export function SettingsScreen() {
     downloadCSV(combinedToCSV(meals, metrics), `gd-tracker-export-${date}.csv`);
   };
 
-  const handleExportDoctorFormat = () => {
+  // The server-side report is gated per user; anyone the flag does not admit gets the local build.
+  const handleExportDoctorFormat = async () => {
     const date = new Date().toISOString().slice(0, 10);
-    downloadCSV(doctorFormatToCSV(meals, metrics), `gd-tracker-doctor-format-${date}.csv`);
+    const filename = `gd-tracker-doctor-format-${date}.csv`;
+    const result = await fetchDoctorReport();
+    if (result.kind === 'csv') {
+      downloadCSV(result.csv, filename);
+      return;
+    }
+    if (result.kind === 'error') console.error('Doctor report failed, exporting locally:', result.message);
+    downloadCSV(doctorFormatToCSV(meals, metrics), filename);
   };
 
   if (loading) {

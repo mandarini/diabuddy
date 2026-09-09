@@ -1,5 +1,5 @@
-import { FunctionsHttpError } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
+import { describeFunctionError as describeFunctionErrorInfo } from '@/lib/supabase/functionError';
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
 
@@ -110,15 +110,7 @@ export async function disableReminders(): Promise<{ error: string | null }> {
 }
 
 async function describeFunctionError(error: unknown): Promise<string> {
-  if (error instanceof FunctionsHttpError) {
-    try {
-      const body = await error.context.json();
-      if (typeof body?.error === 'string') return body.error;
-    } catch {
-      // fall through to the generic message
-    }
-  }
-  return error instanceof Error ? error.message : 'Request failed';
+  return (await describeFunctionErrorInfo(error)).message;
 }
 
 export async function sendTestNotification(): Promise<{ error: string | null }> {
