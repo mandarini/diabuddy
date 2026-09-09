@@ -1,0 +1,6 @@
+project_id = "diabuddy"
+
+# The cron job authenticates with a secret API key on the `apikey` header,
+# which the platform JWT check cannot validate; @supabase/server does it instead.
+[functions.send-glucose-reminders]
+verify_jwt = false
