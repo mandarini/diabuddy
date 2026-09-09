@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Bell } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -7,7 +7,10 @@ import {
   enableReminders,
   getPushSupport,
   isEnabledOnThisDevice,
+  listDevices,
+  removeDevice,
   sendTestNotification,
+  type DeviceInfo,
   type PushSupport,
 } from '@/lib/push/reminders';
 
@@ -26,12 +29,24 @@ export function RemindersCard() {
   const [error, setError] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const [testSent, setTestSent] = useState(false);
+  const [otherDevices, setOtherDevices] = useState<DeviceInfo[]>([]);
+  const [removing, setRemoving] = useState<string | null>(null);
+
+  const refreshDevices = useCallback(async () => {
+    const result = await listDevices();
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    setOtherDevices(result.devices.filter((d) => !d.isThisDevice));
+  }, []);
 
   useEffect(() => {
     const current = getPushSupport();
     setSupport(current);
     if (current === 'available') isEnabledOnThisDevice().then(setEnabled);
-  }, []);
+    refreshDevices();
+  }, [refreshDevices]);
 
   const handleEnable = async () => {
     setBusy(true);
@@ -44,6 +59,7 @@ export function RemindersCard() {
       return;
     }
     setEnabled(true);
+    refreshDevices();
   };
 
   const handleDisable = async () => {
@@ -56,6 +72,19 @@ export function RemindersCard() {
       return;
     }
     setEnabled(false);
+    refreshDevices();
+  };
+
+  const handleRemove = async (endpoint: string) => {
+    setRemoving(endpoint);
+    setError(null);
+    const result = await removeDevice(endpoint);
+    setRemoving(null);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    refreshDevices();
   };
 
   const handleTest = async () => {
@@ -97,6 +126,30 @@ export function RemindersCard() {
         <Button onClick={handleEnable} disabled={busy}>
           {busy ? 'Enabling...' : 'Enable on this device'}
         </Button>
+      )}
+
+      {otherDevices.length > 0 && (
+        <div className="mt-4 space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-stone-400">Other devices</p>
+          <ul className="space-y-2">
+            {otherDevices.map((device) => (
+              <li key={device.endpoint} className="flex items-center justify-between gap-3 text-sm">
+                <span className="text-stone-600">
+                  {device.label}
+                  <span className="text-stone-400"> · added {new Date(device.createdAt).toLocaleDateString()}</span>
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleRemove(device.endpoint)}
+                  disabled={removing !== null}
+                >
+                  {removing === device.endpoint ? 'Removing...' : 'Remove'}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {testSent && <p className="text-sm text-teal-600 mt-2">Sent — check your notifications.</p>}

@@ -60,13 +60,53 @@ export async function enableReminders(): Promise<{ error: string | null }> {
   return { error: null };
 }
 
+export interface DeviceInfo {
+  endpoint: string;
+  label: string;
+  createdAt: string;
+  isThisDevice: boolean;
+}
+
+// The push service host is the only device hint a subscription carries.
+function labelForEndpoint(endpoint: string): string {
+  const host = new URL(endpoint).hostname;
+  if (host.endsWith('push.apple.com')) return 'Safari / iPhone';
+  if (host === 'fcm.googleapis.com' || host.endsWith('android.googleapis.com')) return 'Chrome / Android';
+  if (host.endsWith('push.services.mozilla.com')) return 'Firefox';
+  if (host.endsWith('notify.windows.com')) return 'Edge / Windows';
+  return host;
+}
+
+export async function listDevices(): Promise<{ devices: DeviceInfo[]; error: string | null }> {
+  const current = getPushSupport() === 'available' ? await getSubscription() : null;
+  const { data, error } = await supabase
+    .from('push_subscriptions')
+    .select('endpoint, created_at')
+    .order('created_at', { ascending: true });
+  if (error) return { devices: [], error: error.message };
+  const devices = (data ?? []).map((row) => ({
+    endpoint: row.endpoint as string,
+    label: labelForEndpoint(row.endpoint as string),
+    createdAt: row.created_at as string,
+    isThisDevice: current?.endpoint === row.endpoint,
+  }));
+  return { devices, error: null };
+}
+
+export async function removeDevice(endpoint: string): Promise<{ error: string | null }> {
+  const { data, error } = await supabase.functions.invoke('remove-device', { body: { endpoint } });
+  if (error) return { error: await describeFunctionError(error) };
+  if (!data?.removed) return { error: 'Unexpected response from the reminder service' };
+
+  const current = getPushSupport() === 'available' ? await getSubscription() : null;
+  if (current?.endpoint === endpoint) await current.unsubscribe();
+  return { error: null };
+}
+
 export async function disableReminders(): Promise<{ error: string | null }> {
   const subscription = await getSubscription();
   if (!subscription) return { error: null };
-  const { endpoint } = subscription;
-  await subscription.unsubscribe();
-  const { error } = await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint);
-  return { error: error?.message ?? null };
+  return removeDevice(subscription.endpoint);
 }
 
 async function describeFunctionError(error: unknown): Promise<string> {

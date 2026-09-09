@@ -21,7 +21,7 @@ It is not a calorie counter or a comprehensive food diary. DiaBuddy focuses on f
 - **History:** Search and filter previous meals by meal slot or carbohydrate category, then edit or delete entries.
 - **Insights:** Compare glucose averages by carbohydrate type, fruit, pairings, and post-meal walking. Repeated meals can also be compared with and without a walk.
 - **Settings:** Set glucose targets and due date, export meal data as CSV, and sign out.
-- **Reminders:** Opt in per device to a push notification one hour after a meal whose 1-hour reading is still missing.
+- **Reminders:** Opt in per device to a push notification one hour after a meal whose 1-hour reading is still missing; send a test notification, and remove devices you no longer use.
 
 DiaBuddy stores data in Supabase. Its database schema uses row-level security so authenticated users can access only their own records.
 
@@ -86,9 +86,9 @@ Reminders are Web Push notifications sent by the `send-glucose-reminders` Edge F
 The two Deno functions in [`supabase/functions`](supabase/functions) are built on [`@supabase/server`](https://github.com/supabase/server) and [`@supabase/middleware`](https://github.com/supabase/middleware). Each function pins its dependencies in its own `deno.json`; `_shared/` holds the code both use.
 
 - **`send-glucose-reminders`** is invoked by Supabase Cron every five minutes with the `cron` secret key on the `apikey` header. Its stack is `pipeline([withSupabase({ auth: 'secret:cron' }), withPostgresAdminClient()], handler)`. `withSupabase` accepts only that named key and answers anything else with 401 (`verify_jwt` is off for this function in `supabase/config.toml`, because the platform check cannot validate `sb_secret_` keys). `withPostgresAdminClient` contributes `ctx.postgresAdmin`, a direct Postgres connection; one SQL statement selects the due meals joined to their devices, and the handler sends each push, marks `reminder_sent_at`, and prunes dead subscriptions.
-- **`send-test-notification`** is invoked from the browser by a signed-in user through `supabase.functions.invoke`. Its stack is `pipeline([withCors({ origin: ALLOWED_ORIGINS }), withSupabase({ auth: 'user', cors: 'disabled' }), withPushSubscription()], handler)`. `withCors` answers the preflight ahead of the auth gate. `withSupabase` verifies the session JWT and contributes `ctx.supabase`, an RLS-scoped client. `withPushSubscription` ([`_shared/with-push-subscription.ts`](supabase/functions/_shared/with-push-subscription.ts)) is a `defineMiddleware` entry that declares `supabase` as a prerequisite, reads `{ endpoint }` from the body, and either contributes `ctx.pushSubscription` or short-circuits with 400/404. The handler only sends.
+- **`send-test-notification`** and **`remove-device`** are invoked from the browser by a signed-in user through `supabase.functions.invoke`, each with `{ endpoint }` in the body. Both are `pipeline([withDeviceRequest()], handler)`, where `withDeviceRequest` ([`_shared/with-device-request.ts`](supabase/functions/_shared/with-device-request.ts)) is a `defineComposite` bundling `withCors({ origin: ALLOWED_ORIGINS })`, `withSupabase({ auth: 'user', cors: 'disabled' })`, and `withPushSubscription()`, with `cors` marked `internal` since no handler reads it. `withCors` answers the preflight ahead of the auth gate. `withSupabase` verifies the session JWT and contributes `ctx.supabase`, an RLS-scoped client. `withPushSubscription` ([`_shared/with-push-subscription.ts`](supabase/functions/_shared/with-push-subscription.ts)) is a `defineMiddleware` entry that declares `supabase` as a prerequisite and either contributes `ctx.pushSubscription` — the caller's own row for that endpoint — or short-circuits with 400/404. The handlers only send a push, or delete the row.
 
-`ALLOWED_ORIGINS` in `send-test-notification/index.ts` lists the origins allowed to call that function; set it to your deployment's origin.
+`ALLOWED_ORIGINS` in `_shared/with-device-request.ts` lists the origins allowed to call those functions; set it to your deployment's origin.
 
 ## Data Isolation
 
