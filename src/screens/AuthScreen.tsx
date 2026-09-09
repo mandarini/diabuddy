@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/Input';
 import { Activity } from 'lucide-react';
 
 export function AuthScreen() {
-  const { signIn } = useAuth();
+  const { signIn, signInWithGitHub } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -18,6 +18,17 @@ export function AuthScreen() {
     const { error: err } = await signIn(email.trim(), password);
     setSubmitting(false);
     if (err) {
+      setError(err);
+    }
+  };
+
+  const handleGitHub = async () => {
+    setError(null);
+    setSubmitting(true);
+    const { error: err } = await signInWithGitHub();
+    // On success the browser is leaving for GitHub; only a failure needs the form back.
+    if (err) {
+      setSubmitting(false);
       setError(err);
     }
   };
@@ -35,6 +46,23 @@ export function AuthScreen() {
           <p className="text-sm text-stone-500 mt-2 text-center">
             Track meals, glucose, and daily metrics
           </p>
+        </div>
+
+        <Button
+          type="button"
+          variant="secondary"
+          size="lg"
+          className="w-full"
+          onClick={handleGitHub}
+          disabled={submitting}
+        >
+          Continue with GitHub
+        </Button>
+
+        <div className="flex items-center gap-3 my-6">
+          <span className="h-px flex-1 bg-stone-200" />
+          <span className="text-xs uppercase tracking-wide text-stone-400">or</span>
+          <span className="h-px flex-1 bg-stone-200" />
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">

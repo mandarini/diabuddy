@@ -42,9 +42,9 @@ DiaBuddy stores data in Supabase. Its database schema uses row-level security so
 	VITE_VAPID_PUBLIC_KEY=your-vapid-public-key
 	```
 
-	`VITE_OWNER_EMAIL` is the only account allowed past the sign-in screen.
+	When `VITE_OWNER_EMAIL` is set, it is the only account allowed past the sign-in screen; leave it empty to admit anyone who signs in.
 
-3. Apply the SQL migrations in [`supabase/migrations`](supabase/migrations) to your Supabase project and configure an authentication provider there.
+3. Apply the SQL migrations in [`supabase/migrations`](supabase/migrations) to your Supabase project and configure authentication there. Email/password sign-in works for accounts created in the dashboard (there is no sign-up form). For **Sign in with GitHub**, register a GitHub OAuth App with callback URL `https://<project-ref>.supabase.co/auth/v1/callback`, enable the GitHub provider under Authentication → Providers with its Client ID and secret, and under Authentication → URL Configuration set the Site URL to your deployment and add `http://localhost:5173/**` to the redirect URLs. A GitHub account whose primary email matches an existing user is linked to that user.
 
 4. Start the development server:
 

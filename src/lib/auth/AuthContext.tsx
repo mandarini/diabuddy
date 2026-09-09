@@ -1,12 +1,14 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
+import { disableReminders, getPushSupport } from '@/lib/push/reminders';
 
 interface AuthContextValue {
   session: Session | null;
   user: User | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signInWithGitHub: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -35,13 +37,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null };
   };
 
+  const signInWithGitHub = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'github',
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) return { error: error.message };
+    return { error: null };
+  };
+
+  // A device stops receiving this account's reminders the moment the account leaves it.
   const signOut = async () => {
+    if (getPushSupport() === 'available') {
+      try {
+        await disableReminders();
+      } catch (err) {
+        console.error('Could not remove push subscription on sign-out:', err);
+      }
+    }
     await supabase.auth.signOut();
   };
 
   return (
     <AuthContext.Provider
-      value={{ session, user: session?.user ?? null, loading, signIn, signOut }}
+      value={{ session, user: session?.user ?? null, loading, signIn, signInWithGitHub, signOut }}
     >
       {children}
     </AuthContext.Provider>
