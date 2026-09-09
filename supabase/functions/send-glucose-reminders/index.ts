@@ -1,8 +1,13 @@
+// `pg` is an optional peer of @supabase/server; a root import is what lets Deno resolve it
+// for the postgres-admin entry.
+import 'pg';
+import { pipeline } from '@supabase/middleware';
 import { withSupabase } from '@supabase/server';
+import { withPostgresAdminClient } from '@supabase/server/middleware/postgres-admin';
 import { configureVapid, sendPush, type PushSubscriptionKeys } from '../_shared/push.ts';
 
-const REMINDER_DELAY_MS = 60 * 60 * 1000;
-const RETRY_WINDOW_MS = 3 * 60 * 60 * 1000;
+const REMINDER_DELAY_MINUTES = 60;
+const RETRY_WINDOW_HOURS = 3;
 const BATCH_LIMIT = 100;
 
 const MEAL_SLOT_LABELS: Record<string, string> = {
@@ -14,16 +19,15 @@ const MEAL_SLOT_LABELS: Record<string, string> = {
   other: 'Meal',
 };
 
-interface DueMeal {
-  id: string;
-  user_id: string;
-  meal_slot: string;
-  main_meal: string | null;
-}
-
 interface Subscription extends PushSubscriptionKeys {
   id: string;
-  user_id: string;
+}
+
+interface DueMeal {
+  id: string;
+  meal_slot: string;
+  main_meal: string | null;
+  subscriptions: Subscription[];
 }
 
 function buildPayload(meal: DueMeal): string {
@@ -37,94 +41,94 @@ function buildPayload(meal: DueMeal): string {
 }
 
 export default {
-  // Untyped client: rows are narrowed to DueMeal / Subscription below.
-  fetch: withSupabase<any>({ auth: 'secret:cron' }, async (_req, ctx) => {
-    configureVapid();
-    const db = ctx.supabaseAdmin;
-    const now = Date.now();
-    const dueBefore = new Date(now - REMINDER_DELAY_MS).toISOString();
-    const notBefore = new Date(now - RETRY_WINDOW_MS).toISOString();
+  fetch: pipeline(
+    [withSupabase({ auth: 'secret:cron' }), withPostgresAdminClient()],
+    async (_req, ctx) => {
+      configureVapid();
+      const sql = ctx.postgresAdmin;
 
-    const { data: candidateRows, error: mealsError } = await db
-      .from('meal_entries')
-      .select('id, user_id, meal_slot, main_meal')
-      .is('glucose_1h_mg_dl', null)
-      .is('reminder_sent_at', null)
-      .lte('eaten_at', dueBefore)
-      .gt('eaten_at', notBefore)
-      .limit(BATCH_LIMIT);
-    if (mealsError) return Response.json({ error: mealsError.message }, { status: 500 });
-    const candidates = (candidateRows ?? []) as DueMeal[];
+      let dueMeals: DueMeal[];
+      try {
+        // A meal is due once its 1-hour reading is still missing at the 60-minute mark;
+        // the 3-hour bound is the retry window. Meals whose user has no device drop out via the join.
+        dueMeals = await sql.query`
+          select m.id, m.meal_slot, m.main_meal,
+                 json_agg(json_build_object(
+                   'id', s.id, 'endpoint', s.endpoint, 'p256dh', s.p256dh, 'auth', s.auth
+                 )) as subscriptions
+          from public.meal_entries m
+          join public.push_subscriptions s on s.user_id = m.user_id
+          where m.glucose_1h_mg_dl is null
+            and m.reminder_sent_at is null
+            and m.eaten_at <= now() - ${REMINDER_DELAY_MINUTES}::int * interval '1 minute'
+            and m.eaten_at >  now() - ${RETRY_WINDOW_HOURS}::int * interval '1 hour'
+          group by m.id
+          order by m.eaten_at
+          limit ${BATCH_LIMIT}
+        `;
+      } catch (err) {
+        return Response.json({ error: (err as Error).message }, { status: 500 });
+      }
 
-    const userIds = [...new Set(candidates.map((m) => m.user_id))];
-    let subscriptions: Subscription[] = [];
-    if (userIds.length > 0) {
-      const { data, error } = await db
-        .from('push_subscriptions')
-        .select('id, user_id, endpoint, p256dh, auth')
-        .in('user_id', userIds);
-      if (error) return Response.json({ error: error.message }, { status: 500 });
-      subscriptions = (data ?? []) as Subscription[];
-    }
+      let sent = 0;
+      let failed = 0;
+      const deliveredMealIds: string[] = [];
+      const staleSubscriptionIds = new Set<string>();
 
-    const subsByUser = new Map<string, Subscription[]>();
-    for (const sub of subscriptions) {
-      subsByUser.set(sub.user_id, [...(subsByUser.get(sub.user_id) ?? []), sub]);
-    }
-
-    const dueMeals = candidates.filter((m) => subsByUser.has(m.user_id));
-    let sent = 0;
-    let failed = 0;
-    const deliveredMealIds: string[] = [];
-    const staleSubscriptionIds = new Set<string>();
-
-    for (const meal of dueMeals) {
-      const payload = buildPayload(meal);
-      let delivered = false;
-      for (const sub of subsByUser.get(meal.user_id)!) {
-        const result = await sendPush(sub, payload);
-        if (result.ok) {
-          sent += 1;
-          delivered = true;
-          continue;
+      for (const meal of dueMeals) {
+        const payload = buildPayload(meal);
+        let delivered = false;
+        for (const sub of meal.subscriptions) {
+          const result = await sendPush(sub, payload);
+          if (result.ok) {
+            sent += 1;
+            delivered = true;
+            continue;
+          }
+          failed += 1;
+          // A dead subscription is pruned; any other failure is retried next tick.
+          if (result.gone) {
+            staleSubscriptionIds.add(sub.id);
+          } else {
+            console.error('push failed', {
+              mealId: meal.id,
+              subscriptionId: sub.id,
+              status: result.status,
+              message: result.message,
+            });
+          }
         }
-        failed += 1;
-        // A dead subscription is pruned; any other failure is retried next tick.
-        if (result.gone) {
-          staleSubscriptionIds.add(sub.id);
-        } else {
-          console.error('push failed', {
-            mealId: meal.id,
-            subscriptionId: sub.id,
-            status: result.status,
-            message: result.message,
-          });
+        if (delivered) deliveredMealIds.push(meal.id);
+      }
+
+      if (deliveredMealIds.length > 0) {
+        try {
+          await sql.query`
+            update public.meal_entries set reminder_sent_at = now()
+            where id = any(${deliveredMealIds}::uuid[])
+          `;
+        } catch (err) {
+          console.error('failed to mark reminders sent', (err as Error).message);
         }
       }
-      if (delivered) deliveredMealIds.push(meal.id);
-    }
 
-    if (deliveredMealIds.length > 0) {
-      const { error } = await db
-        .from('meal_entries')
-        .update({ reminder_sent_at: new Date().toISOString() })
-        .in('id', deliveredMealIds);
-      if (error) console.error('failed to mark reminders sent', error.message);
-    }
+      if (staleSubscriptionIds.size > 0) {
+        try {
+          await sql.query`
+            delete from public.push_subscriptions
+            where id = any(${[...staleSubscriptionIds]}::uuid[])
+          `;
+        } catch (err) {
+          console.error('failed to remove stale subscriptions', (err as Error).message);
+        }
+      }
 
-    if (staleSubscriptionIds.size > 0) {
-      const { error } = await db
-        .from('push_subscriptions')
-        .delete()
-        .in('id', [...staleSubscriptionIds]);
-      if (error) console.error('failed to remove stale subscriptions', error.message);
-    }
-
-    return Response.json({
-      due: dueMeals.length,
-      sent,
-      failed,
-      removedSubscriptions: staleSubscriptionIds.size,
-    });
-  }),
+      return Response.json({
+        due: dueMeals.length,
+        sent,
+        failed,
+        removedSubscriptions: staleSubscriptionIds.size,
+      });
+    },
+  ),
 };
