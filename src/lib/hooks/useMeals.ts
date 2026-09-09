@@ -59,7 +59,7 @@ export function useAllMeals() {
 }
 
 export async function createMeal(
-  meal: Omit<MealEntry, 'id' | 'user_id' | 'created_at' | 'updated_at'>
+  meal: Omit<MealEntry, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'reminder_sent_at'>
 ): Promise<{ data: MealEntry | null; error: string | null }> {
   const { data, error } = await supabase
     .from('meal_entries')

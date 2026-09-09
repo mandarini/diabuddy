@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Loading';
+import { RemindersCard } from '@/components/RemindersCard';
 import { Download, LogOut, Baby, Target, Clock } from 'lucide-react';
 import { formatFoodLabel, type MealWithRelations, type DailyMetrics, type MealSlot } from '@/lib/types';
 
@@ -297,6 +298,8 @@ export function SettingsScreen() {
           </Button>
         </div>
       </Card>
+
+      <RemindersCard />
 
       {/* Sign out */}
       <Card className="p-4">

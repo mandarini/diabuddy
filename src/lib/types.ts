@@ -16,6 +16,7 @@ export interface MealEntry {
   glucose_measured_at: string | null;
   glucose_followup_mg_dl: number | null;
   glucose_followup_measured_at: string | null;
+  reminder_sent_at: string | null;
   walked_after: boolean;
   walk_minutes: number | null;
   notes: string | null;
@@ -108,6 +109,15 @@ export interface UserSettings {
   postmeal_1h_target_max: number | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface PushSubscriptionRow {
+  id: string;
+  user_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  created_at: string;
 }
 
 export const MEAL_SLOTS: { value: MealSlot; label: string }[] = [
