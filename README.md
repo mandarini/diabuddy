@@ -42,6 +42,8 @@ DiaBuddy stores data in Supabase. Its database schema uses row-level security so
 	VITE_VAPID_PUBLIC_KEY=your-vapid-public-key
 	```
 
+	`VITE_OWNER_EMAIL` is the only account allowed past the sign-in screen.
+
 3. Apply the SQL migrations in [`supabase/migrations`](supabase/migrations) to your Supabase project and configure an authentication provider there.
 
 4. Start the development server:
@@ -70,14 +72,30 @@ Reminders are Web Push notifications sent by the `send-glucose-reminders` Edge F
 	select vault.create_secret('sb_secret_...', 'cron_secret_key');
 	```
 
-6. Deploy the function and apply the migrations (the cron schedule is a migration):
+6. Deploy the functions and apply the migrations (the cron schedule is a migration):
 
 	```sh
-	supabase functions deploy send-glucose-reminders
+	supabase functions deploy
 	supabase db push --linked
 	```
 
 7. Open Settings on each device and press **Enable on this device**. On iPhone, add the app to the Home Screen first. **Send test notification** confirms delivery to that device without waiting for a meal.
+
+## Edge Functions
+
+The two Deno functions in [`supabase/functions`](supabase/functions) are built on [`@supabase/server`](https://github.com/supabase/server) and [`@supabase/middleware`](https://github.com/supabase/middleware). Each function pins its dependencies in its own `deno.json`; `_shared/` holds the code both use.
+
+- **`send-glucose-reminders`** is invoked by Supabase Cron every five minutes with the `cron` secret key on the `apikey` header. Its stack is `pipeline([withSupabase({ auth: 'secret:cron' }), withPostgresAdminClient()], handler)`. `withSupabase` accepts only that named key and answers anything else with 401 (`verify_jwt` is off for this function in `supabase/config.toml`, because the platform check cannot validate `sb_secret_` keys). `withPostgresAdminClient` contributes `ctx.postgresAdmin`, a direct Postgres connection; one SQL statement selects the due meals joined to their devices, and the handler sends each push, marks `reminder_sent_at`, and prunes dead subscriptions.
+- **`send-test-notification`** is invoked from the browser by a signed-in user through `supabase.functions.invoke`. Its stack is `pipeline([withCors({ origin: ALLOWED_ORIGINS }), withSupabase({ auth: 'user', cors: 'disabled' }), withPushSubscription()], handler)`. `withCors` answers the preflight ahead of the auth gate. `withSupabase` verifies the session JWT and contributes `ctx.supabase`, an RLS-scoped client. `withPushSubscription` ([`_shared/with-push-subscription.ts`](supabase/functions/_shared/with-push-subscription.ts)) is a `defineMiddleware` entry that declares `supabase` as a prerequisite, reads `{ endpoint }` from the body, and either contributes `ctx.pushSubscription` or short-circuits with 400/404. The handler only sends.
+
+`ALLOWED_ORIGINS` in `send-test-notification/index.ts` lists the origins allowed to call that function; set it to your deployment's origin.
+
+## Data Isolation
+
+- Every table has row-level security with owner policies (`user_id = auth.uid()`). The browser reaches Postgres with the publishable key plus the user's session JWT, so a user can read and write only their own rows.
+- `send-test-notification` runs under the caller's JWT. The subscription lookup and the deletion of an expired one both go through RLS, so a user can target only their own devices.
+- `send-glucose-reminders` is the one component that crosses users, because it has to see every due meal. It is reachable only with the `cron` secret key held in Vault, returns counts rather than rows, and joins each meal to the subscriptions of the same `user_id`, so a reminder about a meal reaches only that user's devices. Push payloads carry the meal slot and dish name, never glucose values, and Web Push encrypts them end to end.
+- Secrets stay out of the client. The VAPID private key lives in function secrets and the `cron` key in Vault; the bundle contains only the publishable key and the VAPID public key.
 
 ## Scripts
 
