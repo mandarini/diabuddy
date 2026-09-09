@@ -10,6 +10,7 @@ import { GlucoseModal } from '@/components/GlucoseModal';
 import { WalkModal } from '@/components/WalkModal';
 import { BloodPressureModal } from '@/components/BloodPressureModal';
 import { FastingGlucoseModal } from '@/components/FastingGlucoseModal';
+import { WeightModal } from '@/components/WeightModal';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Loading';
 import type { MealWithRelations, MealSlot } from '@/lib/types';
@@ -32,6 +33,7 @@ export function TodayScreen({ userId: _userId }: TodayScreenProps) {
   const [morningBpOpen, setMorningBpOpen] = useState(false);
   const [eveningBpOpen, setEveningBpOpen] = useState(false);
   const [fastingOpen, setFastingOpen] = useState(false);
+  const [weightOpen, setWeightOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<MealWithRelations | null>(null);
 
   const handleSaveMeal = useCallback(
@@ -180,6 +182,18 @@ export function TodayScreen({ userId: _userId }: TodayScreenProps) {
       const { error } = await upsertDailyMetrics(todayDate, {
         fasting_glucose_mg_dl: glucose,
         fasting_measured_at: measuredAt,
+      });
+      if (error) throw new Error(error);
+      refetchMetrics();
+    },
+    [todayDate, refetchMetrics]
+  );
+
+  const handleSaveWeight = useCallback(
+    async (weightKg: number, measuredAt: string) => {
+      const { error } = await upsertDailyMetrics(todayDate, {
+        weight_kg: weightKg,
+        weight_measured_at: measuredAt,
       });
       if (error) throw new Error(error);
       refetchMetrics();
@@ -340,6 +354,24 @@ export function TodayScreen({ userId: _userId }: TodayScreenProps) {
         </div>
       </button>
 
+      {/* Weight card */}
+      <button
+        onClick={() => setWeightOpen(true)}
+        className="w-full bg-white rounded-2xl border border-stone-100 p-4 text-left hover:shadow-sm transition-shadow"
+      >
+        <div className="flex items-center gap-1.5 text-xs text-stone-400 mb-1">
+          <Scale size={12} /> Weight
+        </div>
+        {metrics?.weight_kg ? (
+          <p className="text-lg font-bold text-stone-700">
+            {metrics.weight_kg}
+            <span className="text-xs font-normal text-stone-400 ml-1">kg</span>
+          </p>
+        ) : (
+          <p className="text-sm text-stone-300">Not logged</p>
+        )}
+      </button>
+
       {/* Modals */}
       <MealFormModal
         open={mealFormOpen}
@@ -401,6 +433,13 @@ export function TodayScreen({ userId: _userId }: TodayScreenProps) {
         currentValue={metrics?.fasting_glucose_mg_dl}
         currentMeasuredAt={metrics?.fasting_measured_at}
         targetMax={fastingTarget}
+      />
+      <WeightModal
+        open={weightOpen}
+        onClose={() => setWeightOpen(false)}
+        onSave={handleSaveWeight}
+        currentValue={metrics?.weight_kg}
+        currentMeasuredAt={metrics?.weight_measured_at}
       />
 
       {/* Delete confirmation */}
