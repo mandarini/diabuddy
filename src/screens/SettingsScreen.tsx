@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Loading';
 import { Download, LogOut, Baby, Target, Clock } from 'lucide-react';
-import { formatFoodLabel, type MealWithRelations, type DailyMetrics } from '@/lib/types';
+import { formatFoodLabel, type MealWithRelations, type DailyMetrics, type MealSlot } from '@/lib/types';
 
 function csvField(value: string | number): string {
   const str = String(value);
@@ -91,8 +91,57 @@ function combinedToCSV(meals: MealWithRelations[], metrics: DailyMetrics[]): str
   ].join('\n');
 }
 
+function doctorFormatToCSV(meals: MealWithRelations[], metrics: DailyMetrics[]): string {
+  const rows: string[] = [];
+  rows.push(
+    'ΗΜ/ΝΙΑ,Πρωί νηστική,1 ώρα μετά το πρωινό,1 ώρα μετά μεσημεριανού,1 ώρα μετά το βραδινό,Αρτηριακή πίεση πρωί,Αρτηριακή πίεση απόγευμα,Σημειώσεις'
+  );
+
+  const mealsByDate = new Map<string, MealWithRelations[]>();
+  for (const meal of meals) {
+    const date = meal.eaten_at.slice(0, 10);
+    const dayMeals = mealsByDate.get(date) ?? [];
+    dayMeals.push(meal);
+    mealsByDate.set(date, dayMeals);
+  }
+
+  const dates = new Set<string>([...mealsByDate.keys(), ...metrics.map((m) => m.metric_date)]);
+  const sortedDates = Array.from(dates).sort((a, b) => b.localeCompare(a));
+
+  const glucoseForSlot = (dayMeals: MealWithRelations[] | undefined, slot: MealSlot): string =>
+    (dayMeals ?? [])
+      .filter((meal) => meal.meal_slot === slot && meal.glucose_1h_mg_dl != null)
+      .map((meal) => meal.glucose_1h_mg_dl)
+      .join('; ');
+
+  const formatBP = (systolic: number | null, diastolic: number | null): string =>
+    systolic != null && diastolic != null ? `${systolic}/${diastolic}` : '';
+
+  for (const date of sortedDates) {
+    const dayMeals = mealsByDate.get(date);
+    const dayMetrics = metrics.find((m) => m.metric_date === date);
+    const notes = [dayMetrics?.notes, ...(dayMeals ?? []).map((m) => m.notes)]
+      .filter(Boolean)
+      .join('; ');
+
+    const row = [
+      date,
+      dayMetrics?.fasting_glucose_mg_dl ?? '',
+      glucoseForSlot(dayMeals, 'breakfast'),
+      glucoseForSlot(dayMeals, 'lunch'),
+      glucoseForSlot(dayMeals, 'dinner'),
+      formatBP(dayMetrics?.morning_bp_systolic ?? null, dayMetrics?.morning_bp_diastolic ?? null),
+      formatBP(dayMetrics?.evening_bp_systolic ?? null, dayMetrics?.evening_bp_diastolic ?? null),
+      notes,
+    ].map(csvField);
+    rows.push(row.join(','));
+  }
+
+  return rows.join('\n');
+}
+
 function downloadCSV(csv: string, filename: string) {
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const blob = new Blob([String.fromCharCode(0xfeff), csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -143,6 +192,11 @@ export function SettingsScreen() {
   const handleExport = () => {
     const date = new Date().toISOString().slice(0, 10);
     downloadCSV(combinedToCSV(meals, metrics), `gd-tracker-export-${date}.csv`);
+  };
+
+  const handleExportDoctorFormat = () => {
+    const date = new Date().toISOString().slice(0, 10);
+    downloadCSV(doctorFormatToCSV(meals, metrics), `gd-tracker-doctor-format-${date}.csv`);
   };
 
   if (loading) {
@@ -218,11 +272,17 @@ export function SettingsScreen() {
           <Download size={16} className="text-teal-600" /> Data export
         </h3>
         <p className="text-sm text-stone-500 mb-3">
-          Download all your meal entries and daily metrics (blood pressure, fasting glucose, weight) as a CSV file.
+          Download all your meal entries and daily metrics as a CSV file, or a simplified export
+          in your doctor's fasting/1h-post-meal/blood pressure log format.
         </p>
-        <Button variant="secondary" onClick={handleExport} className="flex items-center gap-1.5">
-          <Download size={16} /> Export CSV
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={handleExport} className="flex items-center gap-1.5">
+            <Download size={16} /> Export CSV
+          </Button>
+          <Button variant="secondary" onClick={handleExportDoctorFormat} className="flex items-center gap-1.5">
+            <Download size={16} /> Export for doctor
+          </Button>
+        </div>
       </Card>
 
       {/* Sign out */}
