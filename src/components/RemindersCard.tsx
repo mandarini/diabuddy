@@ -7,6 +7,7 @@ import {
   enableReminders,
   getPushSupport,
   isEnabledOnThisDevice,
+  sendTestNotification,
   type PushSupport,
 } from '@/lib/push/reminders';
 
@@ -23,6 +24,8 @@ export function RemindersCard() {
   const [enabled, setEnabled] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [testSent, setTestSent] = useState(false);
 
   useEffect(() => {
     const current = getPushSupport();
@@ -55,6 +58,20 @@ export function RemindersCard() {
     setEnabled(false);
   };
 
+  const handleTest = async () => {
+    setTesting(true);
+    setError(null);
+    setTestSent(false);
+    const result = await sendTestNotification();
+    setTesting(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    setTestSent(true);
+    setTimeout(() => setTestSent(false), 4000);
+  };
+
   return (
     <Card className="p-4">
       <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-700 mb-2">
@@ -67,9 +84,12 @@ export function RemindersCard() {
       {support !== 'available' ? (
         <p className="text-sm text-stone-500">{SUPPORT_MESSAGES[support]}</p>
       ) : enabled ? (
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <span className="text-sm text-teal-600">Enabled on this device</span>
-          <Button variant="secondary" size="sm" onClick={handleDisable} disabled={busy}>
+          <Button variant="secondary" size="sm" onClick={handleTest} disabled={busy || testing}>
+            {testing ? 'Sending...' : 'Send test notification'}
+          </Button>
+          <Button variant="secondary" size="sm" onClick={handleDisable} disabled={busy || testing}>
             {busy ? 'Disabling...' : 'Disable'}
           </Button>
         </div>
@@ -79,6 +99,7 @@ export function RemindersCard() {
         </Button>
       )}
 
+      {testSent && <p className="text-sm text-teal-600 mt-2">Sent — check your notifications.</p>}
       {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
     </Card>
   );

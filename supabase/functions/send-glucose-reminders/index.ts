@@ -1,10 +1,9 @@
 import { withSupabase } from '@supabase/server';
-import webpush from 'web-push';
+import { configureVapid, sendPush, type PushSubscriptionKeys } from '../_shared/push.ts';
 
 const REMINDER_DELAY_MS = 60 * 60 * 1000;
 const RETRY_WINDOW_MS = 3 * 60 * 60 * 1000;
 const BATCH_LIMIT = 100;
-const PUSH_TTL_SECONDS = 60 * 60;
 
 const MEAL_SLOT_LABELS: Record<string, string> = {
   breakfast: 'Breakfast',
@@ -22,20 +21,9 @@ interface DueMeal {
   main_meal: string | null;
 }
 
-interface Subscription {
+interface Subscription extends PushSubscriptionKeys {
   id: string;
   user_id: string;
-  endpoint: string;
-  p256dh: string;
-  auth: string;
-}
-
-function configureVapid() {
-  webpush.setVapidDetails(
-    Deno.env.get('VAPID_SUBJECT')!,
-    Deno.env.get('VAPID_PUBLIC_KEY')!,
-    Deno.env.get('VAPID_PRIVATE_KEY')!,
-  );
 }
 
 function buildPayload(meal: DueMeal): string {
@@ -94,28 +82,23 @@ export default {
       const payload = buildPayload(meal);
       let delivered = false;
       for (const sub of subsByUser.get(meal.user_id)!) {
-        try {
-          await webpush.sendNotification(
-            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-            payload,
-            { TTL: PUSH_TTL_SECONDS },
-          );
+        const result = await sendPush(sub, payload);
+        if (result.ok) {
           sent += 1;
           delivered = true;
-        } catch (err) {
-          failed += 1;
-          const status = (err as { statusCode?: number }).statusCode;
-          // 404/410 mean the browser dropped the subscription; anything else is retried next tick.
-          if (status === 404 || status === 410) {
-            staleSubscriptionIds.add(sub.id);
-          } else {
-            console.error('push failed', {
-              mealId: meal.id,
-              subscriptionId: sub.id,
-              status,
-              message: (err as Error).message,
-            });
-          }
+          continue;
+        }
+        failed += 1;
+        // A dead subscription is pruned; any other failure is retried next tick.
+        if (result.gone) {
+          staleSubscriptionIds.add(sub.id);
+        } else {
+          console.error('push failed', {
+            mealId: meal.id,
+            subscriptionId: sub.id,
+            status: result.status,
+            message: result.message,
+          });
         }
       }
       if (delivered) deliveredMealIds.push(meal.id);
