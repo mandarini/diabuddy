@@ -21,6 +21,7 @@ It is not a calorie counter or a comprehensive food diary. DiaBuddy focuses on f
 - **History:** Search and filter previous meals by meal slot or carbohydrate category, then edit or delete entries.
 - **Insights:** Compare glucose averages by carbohydrate type, fruit, pairings, and post-meal walking. Repeated meals can also be compared with and without a walk.
 - **Settings:** Set glucose targets and due date, export meal data as CSV, and sign out.
+- **Reminders:** Opt in per device to a push notification one hour after a meal whose 1-hour reading is still missing.
 
 DiaBuddy stores data in Supabase. Its database schema uses row-level security so authenticated users can access only their own records.
 
@@ -38,6 +39,7 @@ DiaBuddy stores data in Supabase. Its database schema uses row-level security so
 	VITE_SUPABASE_URL=https://your-project.supabase.co
 	VITE_SUPABASE_ANON_KEY=your-publishable-key
 	VITE_OWNER_EMAIL=you@example.com
+	VITE_VAPID_PUBLIC_KEY=your-vapid-public-key
 	```
 
 3. Apply the SQL migrations in [`supabase/migrations`](supabase/migrations) to your Supabase project and configure an authentication provider there.
@@ -47,6 +49,35 @@ DiaBuddy stores data in Supabase. Its database schema uses row-level security so
 	```sh
 	pnpm dev
 	```
+
+## Reminders Setup
+
+Reminders are Web Push notifications sent by the `send-glucose-reminders` Edge Function, which Supabase Cron invokes every five minutes. Everything runs inside the Supabase project.
+
+1. Generate a VAPID key pair once: `npx web-push generate-vapid-keys`.
+2. Put the public key in `.env.local` (and the hosting provider's env) as `VITE_VAPID_PUBLIC_KEY`.
+3. Set the function secrets:
+
+	```sh
+	supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=mailto:you@example.com
+	```
+
+4. In the dashboard, under Settings → API keys → Secret keys, create a secret key named `cron`.
+5. In the SQL editor, store the project URL and that key in Vault:
+
+	```sql
+	select vault.create_secret('https://your-project.supabase.co', 'project_url');
+	select vault.create_secret('sb_secret_...', 'cron_secret_key');
+	```
+
+6. Deploy the function and apply the migrations (the cron schedule is a migration):
+
+	```sh
+	supabase functions deploy send-glucose-reminders
+	supabase db push --linked
+	```
+
+7. Open Settings on each device and press **Enable on this device**. On iPhone, add the app to the Home Screen first.
 
 ## Scripts
 
