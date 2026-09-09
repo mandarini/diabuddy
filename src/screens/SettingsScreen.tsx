@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Loading';
+import { RemindersCard } from '@/components/RemindersCard';
 import { Download, LogOut, Baby, Target, Clock } from 'lucide-react';
 import { formatFoodLabel, type MealWithRelations } from '@/lib/types';
 
@@ -184,6 +185,8 @@ export function SettingsScreen() {
           <Download size={16} /> Export CSV
         </Button>
       </Card>
+
+      <RemindersCard />
 
       {/* Sign out */}
       <Card className="p-4">
