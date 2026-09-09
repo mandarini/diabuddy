@@ -81,6 +81,16 @@ function dailyMetricsToCSV(metrics: DailyMetrics[]): string {
   return rows.join('\n');
 }
 
+function combinedToCSV(meals: MealWithRelations[], metrics: DailyMetrics[]): string {
+  return [
+    'MEALS',
+    mealsToCSV(meals),
+    '',
+    'DAILY METRICS (fasting glucose, blood pressure, weight)',
+    dailyMetricsToCSV(metrics),
+  ].join('\n');
+}
+
 function downloadCSV(csv: string, filename: string) {
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -132,10 +142,7 @@ export function SettingsScreen() {
 
   const handleExport = () => {
     const date = new Date().toISOString().slice(0, 10);
-    downloadCSV(mealsToCSV(meals), `gd-tracker-export-${date}.csv`);
-    setTimeout(() => {
-      downloadCSV(dailyMetricsToCSV(metrics), `gd-tracker-daily-metrics-${date}.csv`);
-    }, 200);
+    downloadCSV(combinedToCSV(meals, metrics), `gd-tracker-export-${date}.csv`);
   };
 
   if (loading) {
@@ -211,7 +218,7 @@ export function SettingsScreen() {
           <Download size={16} className="text-teal-600" /> Data export
         </h3>
         <p className="text-sm text-stone-500 mb-3">
-          Download your meal entries and daily metrics (blood pressure, fasting glucose, weight) as CSV files.
+          Download all your meal entries and daily metrics (blood pressure, fasting glucose, weight) as a CSV file.
         </p>
         <Button variant="secondary" onClick={handleExport} className="flex items-center gap-1.5">
           <Download size={16} /> Export CSV
