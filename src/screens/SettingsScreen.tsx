@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Loading';
 import { RemindersCard } from '@/components/RemindersCard';
-import { Download, LogOut, Baby, Target, Clock } from 'lucide-react';
+import { Download, LogOut, Baby, Target, Clock, Github } from 'lucide-react';
 import { formatFoodLabel, type MealWithRelations, type DailyMetrics, type MealSlot } from '@/lib/types';
 
 function csvField(value: string | number): string {
@@ -301,12 +301,43 @@ export function SettingsScreen() {
 
       <RemindersCard />
 
+      {/* Source code */}
+      <Card className="p-4">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-700 mb-2">
+          <Github size={16} className="text-teal-600" /> Source code
+        </h3>
+        <p className="text-sm text-stone-500">
+          Report bugs or request features on{' '}
+          <a
+            href="https://github.com/mandarini/diabuddy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-teal-600 underline"
+          >
+            GitHub
+          </a>
+          .
+        </p>
+      </Card>
+
       {/* Sign out */}
       <Card className="p-4">
         <Button variant="danger" onClick={signOut} className="flex items-center gap-1.5 w-full">
           <LogOut size={16} /> Sign out
         </Button>
       </Card>
+
+      <p className="text-center text-sm text-stone-400 pb-2">
+        Created with 🐱 by{' '}
+        <a
+          href="https://psyber.city"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-teal-600 underline"
+        >
+          psybercity
+        </a>
+      </p>
     </div>
   );
 }
