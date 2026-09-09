@@ -106,7 +106,19 @@ function doctorFormatToCSV(meals: MealWithRelations[], metrics: DailyMetrics[]):
   }
 
   const dates = new Set<string>([...mealsByDate.keys(), ...metrics.map((m) => m.metric_date)]);
-  const sortedDates = Array.from(dates).sort((a, b) => b.localeCompare(a));
+  const ascendingDates = Array.from(dates).sort((a, b) => a.localeCompare(b));
+  const sortedDates = [...ascendingDates].reverse();
+
+  const WEIGHT_BLOCK_DAYS = 7;
+  const weightByBlockEndDate = new Map<string, number>();
+  for (let i = 0; i < ascendingDates.length; i += WEIGHT_BLOCK_DAYS) {
+    const block = ascendingDates.slice(i, i + WEIGHT_BLOCK_DAYS);
+    const blockEnd = block[block.length - 1];
+    for (const date of block) {
+      const weight = metrics.find((m) => m.metric_date === date)?.weight_kg;
+      if (weight != null) weightByBlockEndDate.set(blockEnd, weight);
+    }
+  }
 
   const glucoseForSlot = (dayMeals: MealWithRelations[] | undefined, slot: MealSlot): string =>
     (dayMeals ?? [])
@@ -120,9 +132,10 @@ function doctorFormatToCSV(meals: MealWithRelations[], metrics: DailyMetrics[]):
   for (const date of sortedDates) {
     const dayMeals = mealsByDate.get(date);
     const dayMetrics = metrics.find((m) => m.metric_date === date);
-    const notes = [dayMetrics?.notes, ...(dayMeals ?? []).map((m) => m.notes)]
-      .filter(Boolean)
-      .join('; ');
+    const noteParts = [dayMetrics?.notes, ...(dayMeals ?? []).map((m) => m.notes)].filter(Boolean);
+    const blockWeight = weightByBlockEndDate.get(date);
+    if (blockWeight != null) noteParts.push(`ΣΒ: ${blockWeight}`);
+    const notes = noteParts.join('; ');
 
     const row = [
       date,
