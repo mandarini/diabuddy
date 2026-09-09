@@ -29,6 +29,32 @@ export function useDailyMetrics(dayDate: string) {
   return { metrics, loading, refetch: fetchMetrics };
 }
 
+export function useAllDailyMetrics() {
+  const [metrics, setMetrics] = useState<DailyMetrics[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchMetrics = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('daily_metrics')
+      .select('*')
+      .order('metric_date', { ascending: false });
+    if (error) {
+      console.error('Error fetching daily metrics:', error.message);
+      setMetrics([]);
+    } else {
+      setMetrics(data as DailyMetrics[]);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchMetrics();
+  }, [fetchMetrics]);
+
+  return { metrics, loading, refetch: fetchMetrics };
+}
+
 export async function upsertDailyMetrics(
   dayDate: string,
   updates: Partial<DailyMetrics>

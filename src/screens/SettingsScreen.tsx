@@ -2,12 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { useUserSettings, upsertUserSettings } from '@/lib/hooks/useUserSettings';
 import { useAllMeals } from '@/lib/hooks/useMeals';
+import { useAllDailyMetrics } from '@/lib/hooks/useDailyMetrics';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Loading';
 import { Download, LogOut, Baby, Target, Clock } from 'lucide-react';
-import { formatFoodLabel, type MealWithRelations } from '@/lib/types';
+import { formatFoodLabel, type MealWithRelations, type DailyMetrics } from '@/lib/types';
 
 function csvField(value: string | number): string {
   const str = String(value);
@@ -51,6 +52,35 @@ function mealsToCSV(meals: MealWithRelations[]): string {
   return rows.join('\n');
 }
 
+function dailyMetricsToCSV(metrics: DailyMetrics[]): string {
+  const rows: string[] = [];
+  rows.push(
+    'date,fasting_glucose_mg_dl,fasting_measured_at,morning_bp_systolic,morning_bp_diastolic,morning_pulse,morning_bp_measured_at,evening_bp_systolic,evening_bp_diastolic,evening_pulse,evening_bp_measured_at,weight_kg,weight_measured_at,notes'
+  );
+
+  for (const m of metrics) {
+    const row = [
+      m.metric_date,
+      m.fasting_glucose_mg_dl ?? '',
+      m.fasting_measured_at ?? '',
+      m.morning_bp_systolic ?? '',
+      m.morning_bp_diastolic ?? '',
+      m.morning_pulse ?? '',
+      m.morning_bp_measured_at ?? '',
+      m.evening_bp_systolic ?? '',
+      m.evening_bp_diastolic ?? '',
+      m.evening_pulse ?? '',
+      m.evening_bp_measured_at ?? '',
+      m.weight_kg ?? '',
+      m.weight_measured_at ?? '',
+      m.notes ?? '',
+    ].map(csvField);
+    rows.push(row.join(','));
+  }
+
+  return rows.join('\n');
+}
+
 function downloadCSV(csv: string, filename: string) {
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -65,6 +95,7 @@ export function SettingsScreen() {
   const { signOut } = useAuth();
   const { settings, loading, refetch } = useUserSettings();
   const { meals } = useAllMeals();
+  const { metrics } = useAllDailyMetrics();
 
   const [edd, setEdd] = useState('');
   const [fastingTarget, setFastingTarget] = useState('');
@@ -100,9 +131,11 @@ export function SettingsScreen() {
   }, [edd, fastingTarget, postmealTarget, refetch]);
 
   const handleExport = () => {
-    const csv = mealsToCSV(meals);
     const date = new Date().toISOString().slice(0, 10);
-    downloadCSV(csv, `gd-tracker-export-${date}.csv`);
+    downloadCSV(mealsToCSV(meals), `gd-tracker-export-${date}.csv`);
+    setTimeout(() => {
+      downloadCSV(dailyMetricsToCSV(metrics), `gd-tracker-daily-metrics-${date}.csv`);
+    }, 200);
   };
 
   if (loading) {
@@ -178,7 +211,7 @@ export function SettingsScreen() {
           <Download size={16} className="text-teal-600" /> Data export
         </h3>
         <p className="text-sm text-stone-500 mb-3">
-          Download all your meal entries as a CSV file.
+          Download your meal entries and daily metrics (blood pressure, fasting glucose, weight) as CSV files.
         </p>
         <Button variant="secondary" onClick={handleExport} className="flex items-center gap-1.5">
           <Download size={16} /> Export CSV
