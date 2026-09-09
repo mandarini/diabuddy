@@ -8,7 +8,8 @@ import { InsightsScreen } from '@/screens/InsightsScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 import { LoadingScreen } from '@/components/ui/Loading';
 
-const OWNER_EMAIL = import.meta.env.VITE_OWNER_EMAIL as string;
+// When set, only this account may use the app; when empty, anyone who signs in may.
+const OWNER_EMAIL = (import.meta.env.VITE_OWNER_EMAIL as string | undefined)?.trim() || null;
 
 function AppContent() {
   const { session, loading, signOut } = useAuth();
@@ -17,7 +18,7 @@ function AppContent() {
   if (loading) return <LoadingScreen />;
   if (!session) return <AuthScreen />;
 
-  if (session.user.email !== OWNER_EMAIL) {
+  if (OWNER_EMAIL && session.user.email !== OWNER_EMAIL) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-stone-50 px-6 text-center">
         <p className="text-stone-700">This account isn't authorized to use this app.</p>
