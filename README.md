@@ -22,6 +22,7 @@ It is not a calorie counter or a comprehensive food diary. DiaBuddy focuses on f
 - **Insights:** Compare glucose averages by carbohydrate type, fruit, pairings, and post-meal walking. Repeated meals can also be compared with and without a walk.
 - **Settings:** Set glucose targets and due date, export meal data as CSV or in the doctor's log format, and sign out.
 - **Reminders:** Opt in per device to a push notification one hour after a meal whose 1-hour reading is still missing; send a test notification, and remove devices you no longer use.
+- **AI assistant:** Connect Claude Code, Claude Desktop, Cursor, or ChatGPT to DiaBuddy's MCP server and ask questions about your own data. See [MCP Server](#mcp-server).
 
 DiaBuddy stores data in Supabase. Its database schema uses row-level security so authenticated users can access only their own records.
 
@@ -100,10 +101,28 @@ The origins allowed to call those functions come from the `ALLOWED_ORIGINS` func
 
 `supabase/functions/mcp` exposes DiaBuddy to MCP clients such as Claude Code. Authentication is Supabase Auth's OAuth 2.1 server: the client discovers it from the function's protected-resource metadata, registers itself, and sends the user to `/oauth/consent` in this app to approve access. Every tool then runs as that user under the same row-level security as the app.
 
-Setup:
+### Connect Claude Code or another MCP client
 
-1. In the dashboard, under Authentication → OAuth Server, enable the OAuth 2.1 server, set the authorization path to `/oauth/consent`, and enable dynamic client registration.
-2. Under Authentication → URL Configuration, add `https://<your-app>/**` to the redirect URLs so the consent page survives a sign-in round trip with its query string intact.
+The hosted server is `https://pxmmallwlrmputmbrkwz.supabase.co/functions/v1/mcp`. The same command and URL are on the Settings screen with copy buttons.
+
+1. Add it to Claude Code at user scope, so it is available in every project:
+
+	```sh
+	claude mcp add diabuddy -s user -t http https://pxmmallwlrmputmbrkwz.supabase.co/functions/v1/mcp
+	```
+
+	Claude Desktop, Cursor, and ChatGPT take the same URL as a custom connector.
+
+2. In a Claude Code session run `/mcp`, choose **diabuddy**, and authenticate. Your browser opens `https://diabuddyme.netlify.app/oauth/consent`. Sign in and press **Approve**. Claude Code stores the tokens, so this happens once per client.
+
+3. Ask questions: "What were my 1-hour readings this week?", "Which dinners kept me under 120?", "Give me the doctor report for the last 14 days." The assistant sees only your rows.
+
+Tools: `list_meals`, `get_meal`, `list_daily_metrics`, `glucose_summary`, and `doctor_report`, plus generated list, get, create, and update tools for each table. There are no delete tools. To disconnect, remove the server from the client (`claude mcp remove diabuddy -s user`).
+
+### Deploying your own
+
+1. In the dashboard, under Authentication → OAuth Server, turn on the OAuth 2.1 server, set the authorization path to `/oauth/consent`, and turn on dynamic client registration.
+2. Under Authentication → URL Configuration, set the Site URL without a trailing slash and add `https://<your-app>/**` to the redirect URLs so the consent page survives a sign-in round trip with its query string intact.
 3. Deploy the function and apply the migrations (the schema comments that describe the generated tools are a migration):
 
 	```sh
@@ -111,13 +130,7 @@ Setup:
 	supabase db push --linked
 	```
 
-4. Add the server to a client:
-
-	```sh
-	claude mcp add diabuddy -t http https://<project-ref>.supabase.co/functions/v1/mcp
-	```
-
-	On first use the client opens `/oauth/consent`; sign in and press **Approve**. Claude Desktop and Cursor take the same URL as a custom connector.
+4. Connect a client as above, with `https://<project-ref>.supabase.co/functions/v1/mcp` as the URL.
 
 ## Feature Flags
 

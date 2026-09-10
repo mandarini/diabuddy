@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Loading';
 import { RemindersCard } from '@/components/RemindersCard';
+import { ConnectAssistantCard } from '@/components/ConnectAssistantCard';
 import { fetchDoctorReport } from '@/lib/export/doctorReport';
 import { Download, LogOut, Baby, Target, Clock, Github } from 'lucide-react';
 import { formatFoodLabel, type MealWithRelations, type DailyMetrics, type MealSlot } from '@/lib/types';
@@ -309,6 +310,8 @@ export function SettingsScreen() {
       </Card>
 
       <RemindersCard />
+
+      <ConnectAssistantCard />
 
       {/* Source code */}
       <Card className="p-4">
