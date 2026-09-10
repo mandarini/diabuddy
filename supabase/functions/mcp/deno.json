@@ -1,0 +1,12 @@
+{
+  "imports": {
+    "@modelcontextprotocol/server": "npm:@modelcontextprotocol/server@2.0.0",
+    "@supabase/middleware": "npm:@supabase/middleware@0.5.0",
+    "@supabase/server": "npm:@supabase/server@1.7.0-beta.0",
+    "@supabase/server/mcp": "npm:@supabase/server@1.7.0-beta.0/mcp",
+    "@supabase/server/middleware/postgres": "npm:@supabase/server@1.7.0-beta.0/middleware/postgres",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.116.0",
+    "pg": "npm:pg@8.23.0",
+    "zod/v4": "npm:zod@4.6.1/v4"
+  }
+}

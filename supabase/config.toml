@@ -4,3 +4,7 @@ project_id = "diabuddy"
 # which the platform JWT check cannot validate; @supabase/server does it instead.
 [functions.send-glucose-reminders]
 verify_jwt = false
+
+# OAuth discovery for MCP clients carries no token; @supabase/server verifies every other request.
+[functions.mcp]
+verify_jwt = false

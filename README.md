@@ -86,14 +86,38 @@ Reminders are Web Push notifications sent by the `send-glucose-reminders` Edge F
 
 ## Edge Functions
 
-The two Deno functions in [`supabase/functions`](supabase/functions) are built on [`@supabase/server`](https://github.com/supabase/server) and [`@supabase/middleware`](https://github.com/supabase/middleware). Each function pins its dependencies in its own `deno.json`; `_shared/` holds the code both use.
+The Deno functions in [`supabase/functions`](supabase/functions) are built on [`@supabase/server`](https://github.com/supabase/server) and [`@supabase/middleware`](https://github.com/supabase/middleware). Each function pins its dependencies in its own `deno.json`; `_shared/` holds the code both use.
 
 - **`send-glucose-reminders`** is invoked by Supabase Cron every five minutes with the `cron` secret key on the `apikey` header. Its stack is `pipeline([withSupabase({ auth: 'secret:cron' }), withPostgresAdminClient()], handler)`. `withSupabase` accepts only that named key and answers anything else with 401 (`verify_jwt` is off for this function in `supabase/config.toml`, because the platform check cannot validate `sb_secret_` keys). `withPostgresAdminClient` contributes `ctx.postgresAdmin`, a direct Postgres connection; one SQL statement selects the due meals joined to their devices, and the handler sends each push, marks `reminder_sent_at`, and prunes dead subscriptions.
 - **`send-test-notification`** and **`remove-device`** are invoked from the browser by a signed-in user through `supabase.functions.invoke`, each with `{ endpoint }` in the body. Both are `pipeline([withDeviceRequest()], handler)`, where `withDeviceRequest` ([`_shared/with-device-request.ts`](supabase/functions/_shared/with-device-request.ts)) is a `defineComposite` bundling `withCors({ origin: ALLOWED_ORIGINS })`, `withSupabase({ auth: 'user', cors: 'disabled' })`, and `withPushSubscription()`, with `cors` marked `internal` since no handler reads it. `withCors` answers the preflight ahead of the auth gate. `withSupabase` verifies the session JWT and contributes `ctx.supabase`, an RLS-scoped client. `withPushSubscription` ([`_shared/with-push-subscription.ts`](supabase/functions/_shared/with-push-subscription.ts)) is a `defineMiddleware` entry that declares `supabase` as a prerequisite and either contributes `ctx.pushSubscription` — the caller's own row for that endpoint — or short-circuits with 400/404. The handlers only send a push, or delete the row.
 
-- **`doctor-report`** builds the doctor-format CSV on the server for users the `doctor-report` feature flag admits. Its stack is `pipeline([withCors(...), withSupabase({ auth: 'user', cors: 'disabled' }), withFeatureFlag({ name: 'doctor-report', evaluate }), withPostgresClient()], handler)`. `withFeatureFlag` reads the caller's row in `feature_flags` (with a client scoped by the request's own token, since `evaluate` sees only the request) and answers `404 feature_disabled` otherwise. `withPostgresClient` contributes `ctx.postgres`, a direct Postgres connection that runs as the caller with RLS enforced; one SQL statement produces the per-day rows, computing days in the user's timezone and weights per 7-day block. The Settings screen tries this function first and falls back to the local CSV when the flag is off.
+- **`doctor-report`** builds the doctor-format CSV on the server for users the `doctor-report` feature flag admits. Its stack is `pipeline([withCors(...), withSupabase({ auth: 'user', cors: 'disabled' }), withFeatureFlag({ name: 'doctor-report', evaluate }), withPostgresClient()], handler)`. `withFeatureFlag` reads the caller's row in `feature_flags` (with a client scoped by the request's own token, since `evaluate` sees only the request) and answers `404 feature_disabled` otherwise. `withPostgresClient` contributes `ctx.postgres`, a direct Postgres connection that runs as the caller with RLS enforced; one SQL statement in [`_shared/doctor-report.ts`](supabase/functions/_shared/doctor-report.ts) produces the per-day rows, computing days in the user's timezone and weights per 7-day block. The Settings screen tries this function first and falls back to the local CSV when the flag is off.
+- **`mcp`** is the MCP server described below. Its stack is `pipeline([withOAuthProtectedResource(), withSupabase({ auth: 'user' }), withPostgresClient()], handler)`. `withOAuthProtectedResource` runs first because the OAuth discovery request carries no token: it serves the protected-resource metadata at `/functions/v1/mcp/oauth-protected-resource` and adds the `WWW-Authenticate` challenge to 401s (`verify_jwt` is off for this function for the same reason). The handler builds one `McpServer` per request from `generateTools(ctx.supabase)` in `@supabase/server/mcp` (list, get, create and update tools for every table the caller can reach, described from the schema's `COMMENT ON` text, minus `delete_*` and the `push_subscriptions` and `feature_flags` tables) plus five hand-written read-only tools in [`mcp/tools.ts`](supabase/functions/mcp/tools.ts): `list_meals`, `get_meal`, `list_daily_metrics`, `glucose_summary`, and `doctor_report`, which shares its SQL with the `doctor-report` function. Every tool runs as the caller through `ctx.supabase` or `ctx.postgres`, so RLS applies exactly as in the app. This function pins `@supabase/server@1.7.0-beta.0` for the generator; the others stay on 1.6.0.
 
 The origins allowed to call those functions come from the `ALLOWED_ORIGINS` function secret (see Reminders Setup); without it only `http://localhost:5173` is allowed.
+
+## MCP Server
+
+`supabase/functions/mcp` exposes DiaBuddy to MCP clients such as Claude Code. Authentication is Supabase Auth's OAuth 2.1 server: the client discovers it from the function's protected-resource metadata, registers itself, and sends the user to `/oauth/consent` in this app to approve access. Every tool then runs as that user under the same row-level security as the app.
+
+Setup:
+
+1. In the dashboard, under Authentication → OAuth Server, enable the OAuth 2.1 server, set the authorization path to `/oauth/consent`, and enable dynamic client registration.
+2. Under Authentication → URL Configuration, add `https://<your-app>/**` to the redirect URLs so the consent page survives a sign-in round trip with its query string intact.
+3. Deploy the function and apply the migrations (the schema comments that describe the generated tools are a migration):
+
+	```sh
+	supabase functions deploy mcp
+	supabase db push --linked
+	```
+
+4. Add the server to a client:
+
+	```sh
+	claude mcp add diabuddy -t http https://<project-ref>.supabase.co/functions/v1/mcp
+	```
+
+	On first use the client opens `/oauth/consent`; sign in and press **Approve**. Claude Desktop and Cursor take the same URL as a custom connector.
 
 ## Feature Flags
 

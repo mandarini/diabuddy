@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Activity } from 'lucide-react';
 
-export function AuthScreen() {
+export function AuthScreen({ redirectTo }: { redirectTo?: string } = {}) {
   const { signIn, signInWithGitHub } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -25,7 +25,7 @@ export function AuthScreen() {
   const handleGitHub = async () => {
     setError(null);
     setSubmitting(true);
-    const { error: err } = await signInWithGitHub();
+    const { error: err } = await signInWithGitHub(redirectTo);
     // On success the browser is leaving for GitHub; only a failure needs the form back.
     if (err) {
       setSubmitting(false);

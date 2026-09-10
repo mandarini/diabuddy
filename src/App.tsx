@@ -7,6 +7,7 @@ import { HistoryScreen } from '@/screens/HistoryScreen';
 import { InsightsScreen } from '@/screens/InsightsScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 import { LoadingScreen } from '@/components/ui/Loading';
+import { OAuthConsentScreen } from '@/screens/OAuthConsentScreen';
 
 // When set, only this account may use the app; when empty, anyone who signs in may.
 const OWNER_EMAIL = (import.meta.env.VITE_OWNER_EMAIL as string | undefined)?.trim() || null;
@@ -39,10 +40,15 @@ function AppContent() {
   );
 }
 
+// Supabase Auth's OAuth server sends users to this path to approve a client; the owner gate in
+// AppContent does not apply there, since an approved client acts as that user under RLS.
+// Auth joins the Site URL and the path verbatim, so a trailing slash on the Site URL arrives as
+// `//oauth/consent`; collapsing repeated slashes keeps the route stable either way.
 function App() {
+  const isConsent = window.location.pathname.replace(/\/{2,}/g, '/') === '/oauth/consent';
   return (
     <AuthProvider>
-      <AppContent />
+      {isConsent ? <OAuthConsentScreen /> : <AppContent />}
     </AuthProvider>
   );
 }
