@@ -42,8 +42,10 @@ function AppContent() {
 
 // Supabase Auth's OAuth server sends users to this path to approve a client; the owner gate in
 // AppContent does not apply there, since an approved client acts as that user under RLS.
+// Auth joins the Site URL and the path verbatim, so a trailing slash on the Site URL arrives as
+// `//oauth/consent`; collapsing repeated slashes keeps the route stable either way.
 function App() {
-  const isConsent = window.location.pathname === '/oauth/consent';
+  const isConsent = window.location.pathname.replace(/\/{2,}/g, '/') === '/oauth/consent';
   return (
     <AuthProvider>
       {isConsent ? <OAuthConsentScreen /> : <AppContent />}
