@@ -6,6 +6,15 @@ import { fetchDoctorReportRows, renderDoctorCsv } from '../_shared/doctor-report
 
 const MEAL_SLOTS = ['breakfast', 'morning_snack', 'lunch', 'afternoon_snack', 'dinner', 'other'] as const;
 
+// Registered by `registerDiabuddyTools`; a generated tool with one of these names yields to it.
+export const DIABUDDY_TOOL_NAMES = [
+  'list_meals',
+  'get_meal',
+  'list_daily_metrics',
+  'glucose_summary',
+  'doctor_report',
+] as const;
+
 // Foods come back as names and category names in place of ids.
 const MEAL_SELECT =
   'id, eaten_at, meal_slot, main_meal, glucose_1h_mg_dl, glucose_measured_at, glucose_followup_mg_dl, glucose_followup_measured_at, walked_after, walk_minutes, notes, ' +
