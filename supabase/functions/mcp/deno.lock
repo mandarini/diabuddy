@@ -3,7 +3,7 @@
   "specifiers": {
     "npm:@modelcontextprotocol/server@2.0.0": "2.0.0",
     "npm:@supabase/middleware@0.5.0": "0.5.0",
-    "npm:@supabase/server@1.7.0-beta.0": "1.7.0-beta.0_@modelcontextprotocol+server@2.0.0_@supabase+supabase-js@2.116.0_pg@8.23.0",
+    "npm:@supabase/server@1.6.0": "1.6.0_@supabase+supabase-js@2.116.0_pg@8.23.0",
     "npm:@supabase/supabase-js@2.116.0": "2.116.0",
     "npm:pg@8.23.0": "8.23.0",
     "npm:zod@4.6.1": "4.6.1"
@@ -56,17 +56,15 @@
         "tslib"
       ]
     },
-    "@supabase/server@1.7.0-beta.0_@modelcontextprotocol+server@2.0.0_@supabase+supabase-js@2.116.0_pg@8.23.0": {
-      "integrity": "sha512-6XQbV6scuFW1UeLSi2VxKIXY962eg44tIeBo90+cKxLNgpAanUP0yF8J8yi2+RptDLMY/3Sfaj8RxPUTud5Djg==",
+    "@supabase/server@1.6.0_@supabase+supabase-js@2.116.0_pg@8.23.0": {
+      "integrity": "sha512-LtUkzUqUGip6I2+kvSmA04u3s+npwLseer2yomBnUdQ1zyJPtlgjAqbwsNuGC1DT/FHi1BvvJluI7dZVV2XdTw==",
       "dependencies": [
-        "@modelcontextprotocol/server",
         "@supabase/middleware",
         "@supabase/supabase-js",
         "jose",
         "pg"
       ],
       "optionalPeers": [
-        "@modelcontextprotocol/server",
         "pg"
       ]
     },
@@ -175,7 +173,7 @@
     "dependencies": [
       "npm:@modelcontextprotocol/server@2.0.0",
       "npm:@supabase/middleware@0.5.0",
-      "npm:@supabase/server@1.7.0-beta.0",
+      "npm:@supabase/server@1.6.0",
       "npm:@supabase/supabase-js@2.116.0",
       "npm:pg@8.23.0",
       "npm:zod@4.6.1"

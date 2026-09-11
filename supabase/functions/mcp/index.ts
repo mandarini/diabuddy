@@ -1,5 +1,5 @@
-// `pg` and `@modelcontextprotocol/server` are optional peers of @supabase/server; root imports
-// are what let Deno resolve them for the postgres entry and the generated tools.
+// `pg` is an optional peer of @supabase/server; the root import is what lets Deno resolve it for
+// the postgres entry.
 import 'pg';
 import { createMcpHandler } from '@modelcontextprotocol/server';
 import { pipeline } from '@supabase/middleware';
@@ -17,7 +17,10 @@ export default {
       withPostgresClient(),
     ],
     async (req, ctx) => {
-      const handler = createMcpHandler(() => buildServer(ctx.supabase, ctx.supabaseAdmin, ctx.postgres));
+      const handler = createMcpHandler(() => buildServer(ctx.supabase, ctx.postgres), {
+        // Factory errors surface as a bare 500 otherwise; logging them puts them in the function logs.
+        onerror: (error) => console.error('MCP request failed', error),
+      });
       return handler.fetch(req);
     },
   ),
